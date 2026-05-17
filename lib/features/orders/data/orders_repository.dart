@@ -23,6 +23,28 @@ class OrdersRepository {
   Future<void> cancelOrder(String id, String reason) async {
     await _dio.post('/orders/$id/cancel', data: {'cancellation_reason': reason});
   }
+
+  Future<Map<String, dynamic>> getPaymentStatus(String orderId) async {
+    final res = await _dio.get('/razorpay/status/$orderId');
+    return res.data as Map<String, dynamic>;
+  }
+
+  Future<Map<String, dynamic>> retryPayment(String orderId) async {
+    final res = await _dio.get('/razorpay/retry/$orderId');
+    return res.data as Map<String, dynamic>;
+  }
+
+  Future<void> verifyRetryPayment(Map<String, dynamic> payload) async {
+    await _dio.post('/razorpay/verify', data: payload);
+  }
+
+  Future<void> reportCheckoutOutcome(String orderId, String outcome, {String? errorDescription}) async {
+    await _dio.post('/razorpay/checkout-outcome', data: {
+      'order_id': orderId,
+      'outcome': outcome,
+      if (errorDescription != null) 'error_description': errorDescription,
+    });
+  }
 }
 
 final ordersRepositoryProvider = Provider<OrdersRepository>((ref) {

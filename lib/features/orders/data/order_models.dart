@@ -6,6 +6,7 @@ class OrderItem {
   final int quantity;
   final double unitPrice;
   final double totalPrice;
+  final String? brandOfferingId;
 
   const OrderItem({
     required this.id,
@@ -15,6 +16,7 @@ class OrderItem {
     required this.quantity,
     required this.unitPrice,
     required this.totalPrice,
+    this.brandOfferingId,
   });
 
   factory OrderItem.fromJson(Map<String, dynamic> j) => OrderItem(
@@ -25,6 +27,7 @@ class OrderItem {
     quantity: int.tryParse(j['quantity']?.toString() ?? '1') ?? 1,
     unitPrice: double.tryParse(j['unit_price']?.toString() ?? '0') ?? 0,
     totalPrice: double.tryParse(j['total_price']?.toString() ?? '0') ?? 0,
+    brandOfferingId: j['medicine_brand_id']?.toString(),
   );
 }
 
@@ -52,6 +55,7 @@ class Order {
   final String? deliveryAddress;
   final String? cancellationReason;
   final String? returnReason;
+  final String? prescriptionPath;
   final DateTime? createdAt;
   final List<OrderItem> items;
   final OrderPayment? payment;
@@ -66,6 +70,7 @@ class Order {
     this.deliveryAddress,
     this.cancellationReason,
     this.returnReason,
+    this.prescriptionPath,
     this.createdAt,
     this.items = const [],
     this.payment,
@@ -85,6 +90,7 @@ class Order {
       deliveryAddress: order['delivery_address']?.toString(),
       cancellationReason: order['cancellation_reason']?.toString(),
       returnReason: order['return_reason']?.toString(),
+      prescriptionPath: order['prescription_path']?.toString(),
       createdAt: order['created_at'] != null ? DateTime.tryParse(order['created_at'].toString()) : null,
       items: itemsRaw.map((e) => OrderItem.fromJson(e as Map<String, dynamic>)).toList(),
       payment: paymentRaw != null ? OrderPayment.fromJson(paymentRaw) : null,

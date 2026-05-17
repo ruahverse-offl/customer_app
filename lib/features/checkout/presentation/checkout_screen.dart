@@ -30,6 +30,7 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
   bool _isSubmitting = false;
   late Razorpay _razorpay;
   Map<String, dynamic>? _pendingPaymentData;
+  List<Map<String, dynamic>> _availableCoupons = [];
 
   @override
   void initState() {
@@ -65,6 +66,10 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
     try {
       final settings = await ref.read(checkoutRepositoryProvider).getDeliverySettings();
       if (mounted) setState(() => _deliveryFee = double.tryParse(settings['delivery_fee']?.toString() ?? '40') ?? 40);
+    } catch (_) {}
+    try {
+      final coupons = await ref.read(checkoutRepositoryProvider).getCoupons();
+      if (mounted) setState(() => _availableCoupons = coupons);
     } catch (_) {}
   }
 
@@ -256,6 +261,28 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
                     style: ElevatedButton.styleFrom(minimumSize: const Size(80, 50)),
                     child: const Text('Apply')),
               ]),
+              if (_availableCoupons.isNotEmpty) ...[
+                const SizedBox(height: 10),
+                Text('Available coupons:', style: AppTextStyles.caption),
+                const SizedBox(height: 6),
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 6,
+                  children: _availableCoupons.map((c) {
+                    final code = c['code']?.toString() ?? '';
+                    final disc = c['discount_value'] != null
+                        ? ' — ${c['discount_type'] == 'PERCENTAGE' ? '${c['discount_value']}%' : '₹${c['discount_value']}'} off'
+                        : '';
+                    return ActionChip(
+                      label: Text('$code$disc', style: AppTextStyles.caption),
+                      onPressed: () {
+                        _couponCtrl.text = code;
+                        _validateCoupon();
+                      },
+                    );
+                  }).toList(),
+                ),
+              ],
               if (_discount > 0) Padding(
                 padding: const EdgeInsets.only(top: 8),
                 child: Text('Coupon applied! Saving ₹${_discount.toStringAsFixed(2)}',

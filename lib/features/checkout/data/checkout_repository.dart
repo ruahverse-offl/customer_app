@@ -12,8 +12,9 @@ class CheckoutRepository {
   }
 
   Future<List<Map<String, dynamic>>> getCoupons() async {
-    final res = await _dio.get('/coupons/');
-    final items = res.data['items'] ?? res.data as List;
+    final res = await _dio.get('/coupons/', queryParameters: {'is_active': 'true'});
+    final raw = res.data;
+    final items = raw is Map ? (raw['items'] ?? []) : raw;
     return (items as List).cast<Map<String, dynamic>>();
   }
 
