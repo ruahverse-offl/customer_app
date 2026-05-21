@@ -8,37 +8,49 @@ class AuthState {
   final AuthUser? user;
   final bool isLoading;
   final String? error;
+  final bool isRestoring;
 
-  const AuthState({this.user, this.isLoading = false, this.error});
-  AuthState copyWith({AuthUser? user, bool? isLoading, String? error, bool clearUser = false}) => AuthState(
+  const AuthState({this.user, this.isLoading = false, this.error, this.isRestoring = false});
+  AuthState copyWith({AuthUser? user, bool? isLoading, String? error, bool clearUser = false, bool? isRestoring}) => AuthState(
     user: clearUser ? null : (user ?? this.user),
     isLoading: isLoading ?? this.isLoading,
     error: error,
+    isRestoring: isRestoring ?? this.isRestoring,
   );
 }
 
 class AuthNotifier extends StateNotifier<AuthState> {
   final AuthRepository _repo;
 
-  AuthNotifier(this._repo) : super(const AuthState()) {
+  AuthNotifier(this._repo) : super(const AuthState(isRestoring: true)) {
     _restore();
   }
 
   Future<void> _restore() async {
     final token = await SecureStorage.getToken();
-    if (token == null) return;
+    if (token == null) {
+      state = const AuthState();
+      return;
+    }
 
-    // Restore user from cache immediately — no network needed
+    // Restore user from cache immediately so the router can unblock
     final cachedJson = await SecureStorage.getUserJson();
     if (cachedJson != null) {
       try {
         final user = AuthUser.fromJson(jsonDecode(cachedJson) as Map<String, dynamic>);
         if (user.roleCode == 'PUBLIC') {
           await SecureStorage.clearAll();
+          state = const AuthState();
           return;
         }
-        state = state.copyWith(user: user);
-      } catch (_) {}
+        state = AuthState(user: user); // isRestoring=false — unblocks router
+      } catch (_) {
+        state = const AuthState();
+        return;
+      }
+    } else {
+      state = const AuthState();
+      return;
     }
 
     // Refresh user data in background (don't block navigation)
@@ -114,7 +126,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
   Future<void> logout() async {
     try { await _repo.logout(); } catch (_) {}
     await SecureStorage.clearAll();
-    state = const AuthState();
+    state = const AuthState(); // isRestoring=false, user=null → router goes to /login
   }
 
   void updateLocalUser(AuthUser updated) {

@@ -31,7 +31,9 @@ class _AuthNotifier extends ChangeNotifier {
   static const _publicRoutes = {'/login', '/terms', '/privacy', '/refund-policy'};
 
   String? redirect(BuildContext context, GoRouterState state) {
-    final isLoggedIn = _ref.read(authNotifierProvider).user != null;
+    final authState = _ref.read(authNotifierProvider);
+    if (authState.isRestoring) return null; // wait — don't redirect before restore completes
+    final isLoggedIn = authState.user != null;
     final isPublic = _publicRoutes.contains(state.matchedLocation);
     if (!isLoggedIn && !isPublic) return '/login';
     if (isLoggedIn && state.matchedLocation == '/login') return '/home';

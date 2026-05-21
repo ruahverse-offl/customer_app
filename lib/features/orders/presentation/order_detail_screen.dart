@@ -1,10 +1,13 @@
 import 'dart:async';
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:path_provider/path_provider.dart';
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
+import 'package:permission_handler/permission_handler.dart';
 import 'package:printing/printing.dart';
 import 'package:razorpay_flutter/razorpay_flutter.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -287,11 +290,47 @@ class _OrderDetailBodyState extends ConsumerState<_OrderDetailBody> {
         ),
       ));
 
-      await Printing.sharePdf(bytes: await pdf.save(), filename: 'invoice_$refNum.pdf');
+      final bytes = await pdf.save();
+      final filename = 'invoice_$refNum.pdf';
+
+      final saveDir = await _resolveInvoiceDir();
+      if (saveDir == null) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: const Text('Storage permission denied. Grant "All files access" in Settings.'),
+              backgroundColor: AppColors.danger,
+              action: SnackBarAction(
+                label: 'Settings',
+                textColor: Colors.white,
+                onPressed: openAppSettings,
+              ),
+            ),
+          );
+        }
+        return;
+      }
+
+      if (!await saveDir.exists()) await saveDir.create(recursive: true);
+      await File('${saveDir.path}/$filename').writeAsBytes(bytes);
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Saved to NEWBALAN/Invoices/$filename'),
+            backgroundColor: AppColors.secondary,
+            action: SnackBarAction(
+              label: 'Share',
+              textColor: Colors.white,
+              onPressed: () => Printing.sharePdf(bytes: bytes, filename: filename),
+            ),
+          ),
+        );
+      }
     } catch (_) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Could not generate invoice.'), backgroundColor: AppColors.danger),
+          const SnackBar(content: Text('Could not save invoice.'), backgroundColor: AppColors.danger),
         );
       }
     }
@@ -306,6 +345,45 @@ class _OrderDetailBodyState extends ConsumerState<_OrderDetailBody> {
         pw.Text(value, style: pw.TextStyle(font: font, fontSize: 10)),
       ]),
     );
+  }
+
+  /// Returns the NEWBALAN/Invoices directory on the device's primary storage.
+  /// Uses getExternalStorageDirectory() to derive the correct root — no hardcoded paths.
+  /// Returns null if permission is denied.
+  Future<Directory?> _resolveInvoiceDir() async {
+    if (Platform.isIOS) {
+      final base = await getApplicationDocumentsDirectory();
+      return Directory('${base.path}/NEWBALAN/Invoices');
+    }
+
+    // Derive the storage root from the app-specific external path.
+    // e.g. /storage/emulated/0/Android/data/com.pkg/files → /storage/emulated/0
+    final appExtDir = await getExternalStorageDirectory();
+    if (appExtDir == null) return null;
+    final storageRoot = appExtDir.path.split('/Android').first;
+
+    Future<Directory> targetDir() => Future.value(
+      Directory('$storageRoot/NEWBALAN/Invoices'),
+    );
+
+    // Android 11+ (API 30+): MANAGE_EXTERNAL_STORAGE for arbitrary paths
+    if (await Permission.manageExternalStorage.isGranted) {
+      return targetDir();
+    }
+
+    // Android 9-10: WRITE_EXTERNAL_STORAGE is enough
+    final storageStatus = await Permission.storage.request();
+    if (storageStatus.isGranted) {
+      return targetDir();
+    }
+
+    // Android 11+: request MANAGE_EXTERNAL_STORAGE (opens the Settings page once)
+    await Permission.manageExternalStorage.request();
+    if (await Permission.manageExternalStorage.isGranted) {
+      return targetDir();
+    }
+
+    return null; // permission denied
   }
 
   void _reorder() {
