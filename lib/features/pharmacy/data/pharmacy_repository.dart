@@ -8,7 +8,7 @@ class PharmacyRepository {
   const PharmacyRepository(this._dio);
 
   Future<List<MedicineCategory>> getCategories() async {
-    final res = await _dio.get('/medicine-categories/');
+    final res = await _dio.get('/medicine-categories');
     final items = (res.data['items'] ?? res.data) as List;
     return items.map((e) => MedicineCategory.fromJson(e as Map<String, dynamic>)).toList();
   }
@@ -19,11 +19,16 @@ class PharmacyRepository {
     int limit = 20,
     int offset = 0,
   }) async {
-    final params = <String, dynamic>{'limit': limit, 'offset': offset};
+    final params = <String, dynamic>{
+      'limit': limit,
+      'offset': offset,
+      'include_brands': true,
+      'is_available': true,
+    };
     if (search != null && search.isNotEmpty) params['search'] = search;
     if (categoryIds != null && categoryIds.isNotEmpty) params['category_id'] = categoryIds.join(',');
 
-    final res = await _dio.get('/medicines/', queryParameters: params);
+    final res = await _dio.get('/medicines', queryParameters: params);
     final data = res.data as Map<String, dynamic>;
     final items = (data['items'] as List).map((e) => Medicine.fromJson(e as Map<String, dynamic>)).toList();
     final total = int.tryParse(data['pagination']?['total']?.toString() ?? '0') ?? 0;

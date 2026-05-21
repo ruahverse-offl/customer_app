@@ -18,7 +18,8 @@ class _BrandSelectionModalState extends ConsumerState<BrandSelectionModal> {
   @override
   void initState() {
     super.initState();
-    if (widget.medicine.offerings.isNotEmpty) _selected = widget.medicine.offerings.first;
+    final available = widget.medicine.purchasableOfferings;
+    if (available.isNotEmpty) _selected = available.first;
   }
 
   void _addToCart() {
@@ -27,11 +28,12 @@ class _BrandSelectionModalState extends ConsumerState<BrandSelectionModal> {
       medicineId: widget.medicine.id,
       medicineName: widget.medicine.name,
       brandOfferingId: _selected!.id,
-      packLabel: '${_selected!.brandName} — ${_selected!.packLabel}',
-      price: _selected!.price,
+      packLabel: _selected!.packLabel,
+      price: _selected!.mrp,
       mrp: _selected!.mrp,
       quantity: _qty,
       requiresPrescription: widget.medicine.requiresPrescription,
+      imageUrl: widget.medicine.imageUrl,
     ));
     Navigator.pop(context);
     ScaffoldMessenger.of(context).showSnackBar(
@@ -77,7 +79,7 @@ class _BrandSelectionModalState extends ConsumerState<BrandSelectionModal> {
                 children: [
                   Text('Select Brand & Pack', style: AppTextStyles.label.copyWith(color: AppColors.textSecondary)),
                   const SizedBox(height: 8),
-                  ...widget.medicine.offerings.map((o) => GestureDetector(
+                  ...widget.medicine.purchasableOfferings.map((o) => GestureDetector(
                     onTap: () => setState(() => _selected = o),
                     child: AnimatedContainer(
                       duration: const Duration(milliseconds: 150),
@@ -97,22 +99,22 @@ class _BrandSelectionModalState extends ConsumerState<BrandSelectionModal> {
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               Text(o.brandName, style: AppTextStyles.label),
-                              Text(o.packLabel, style: AppTextStyles.bodySmall),
+                              if (o.manufacturer != null)
+                                Text(o.manufacturer!, style: AppTextStyles.caption.copyWith(color: AppColors.textMuted)),
+                              if (o.packDescription != null)
+                                Text(o.packDescription!, style: AppTextStyles.bodySmall),
                             ],
                           )),
+                          const SizedBox(width: 8),
                           Column(
                             crossAxisAlignment: CrossAxisAlignment.end,
                             children: [
-                              Text('₹${o.price.toStringAsFixed(2)}', style: AppTextStyles.label.copyWith(color: AppColors.primary)),
-                              if (o.mrp > o.price)
-                                Text('MRP ₹${o.mrp.toStringAsFixed(2)}',
-                                    style: AppTextStyles.caption.copyWith(decoration: TextDecoration.lineThrough)),
+                              Text('₹${o.mrp.toStringAsFixed(2)}',
+                                  style: AppTextStyles.label.copyWith(color: AppColors.primary)),
+                              if (_selected?.id == o.id)
+                                const Icon(Icons.check_circle, color: AppColors.primary, size: 18),
                             ],
                           ),
-                          if (_selected?.id == o.id) ...[
-                            const SizedBox(width: 8),
-                            const Icon(Icons.check_circle, color: AppColors.primary, size: 20),
-                          ],
                         ],
                       ),
                     ),
@@ -139,7 +141,7 @@ class _BrandSelectionModalState extends ConsumerState<BrandSelectionModal> {
                 padding: const EdgeInsets.fromLTRB(20, 12, 20, 8),
                 child: ElevatedButton(
                   onPressed: _selected == null ? null : _addToCart,
-                  child: Text('Add to Cart — ₹${((_selected?.price ?? 0) * _qty).toStringAsFixed(2)}'),
+                  child: Text('Add to Cart — ₹${((_selected?.mrp ?? 0) * _qty).toStringAsFixed(2)}'),
                 ),
               ),
             ),

@@ -7,28 +7,30 @@ class CheckoutRepository {
   const CheckoutRepository(this._dio);
 
   Future<Map<String, dynamic>> getDeliverySettings() async {
-    final res = await _dio.get('/delivery-settings/');
+    final res = await _dio.get('/delivery-settings');
     return res.data as Map<String, dynamic>;
   }
 
   Future<List<Map<String, dynamic>>> getCoupons() async {
-    final res = await _dio.get('/coupons/', queryParameters: {'is_active': 'true'});
+    final res = await _dio.get('/coupons', queryParameters: {'is_active': 'true'});
     final raw = res.data;
     final items = raw is Map ? (raw['items'] ?? []) : raw;
     return (items as List).cast<Map<String, dynamic>>();
   }
 
-  Future<Map<String, dynamic>> validateCoupon(String code, double subtotal) async {
-    final res = await _dio.post('/coupons/validate', data: {'code': code, 'subtotal': subtotal});
+  Future<Map<String, dynamic>> validateCoupon(String code, double orderAmount) async {
+    final res = await _dio.post('/coupons/validate', data: {'code': code, 'order_amount': orderAmount});
     return res.data as Map<String, dynamic>;
   }
 
   Future<String?> uploadPrescription(String filePath, String fileName) async {
     final form = FormData.fromMap({
       'file': await MultipartFile.fromFile(filePath, filename: fileName),
+      'category': 'prescription',
     });
     final res = await _dio.post('/upload', data: form);
-    return res.data['url'] as String?;
+    // Use stored_as (relative path) so backend can validate prescription/ prefix
+    return (res.data['stored_as'] ?? res.data['url']) as String?;
   }
 
   Future<Map<String, dynamic>> initiatePayment(Map<String, dynamic> orderPayload) async {

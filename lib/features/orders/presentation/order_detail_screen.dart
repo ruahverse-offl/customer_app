@@ -2,7 +2,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:intl/intl.dart';
+import 'package:go_router/go_router.dart';
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 import 'package:printing/printing.dart';
@@ -10,10 +10,15 @@ import 'package:razorpay_flutter/razorpay_flutter.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../../../core/config/app_config.dart';
 import '../../../core/theme/app_theme.dart';
+import '../../../core/utils/order_utils.dart';
+import '../../../core/widgets/price_row.dart';
 import '../../auth/providers/auth_provider.dart';
 import '../../cart/providers/cart_provider.dart';
 import '../data/order_models.dart';
 import '../data/orders_repository.dart';
+
+pw.Font? _pdfRegularFont;
+pw.Font? _pdfBoldFont;
 
 final _orderDetailProvider = FutureProvider.autoDispose.family<Order, String>((ref, id) async {
   return ref.watch(ordersRepositoryProvider).getOrderDetail(id);
@@ -32,30 +37,30 @@ class OrderDetailScreen extends ConsumerWidget {
       body: orderAsync.when(
         loading: () => const Center(child: CircularProgressIndicator()),
         error: (e, _) => Center(child: Text('Failed to load order', style: AppTextStyles.body)),
-        data: (order) => _OrderDetailBody(order: order, ref: ref),
+        data: (order) => _OrderDetailBody(order: order),
       ),
     );
   }
 }
 
-class _OrderDetailBody extends StatefulWidget {
+class _OrderDetailBody extends ConsumerStatefulWidget {
   final Order order;
-  final WidgetRef ref;
-  const _OrderDetailBody({required this.order, required this.ref});
+  const _OrderDetailBody({required this.order});
   @override
-  State<_OrderDetailBody> createState() => _OrderDetailBodyState();
+  ConsumerState<_OrderDetailBody> createState() => _OrderDetailBodyState();
 }
 
-class _OrderDetailBodyState extends State<_OrderDetailBody> {
+class _OrderDetailBodyState extends ConsumerState<_OrderDetailBody> {
   bool _cancelling = false;
   bool _completingPayment = false;
   bool _loadingPaymentStatus = false;
-  bool _paymentWindowExpired = false;
   int? _secondsLeft;
   String? _pendingRazorpayOrderId;
   Timer? _countdownTimer;
   late Razorpay _razorpay;
   final _reasonCtrl = TextEditingController();
+
+  bool get _isExpired => _secondsLeft != null && _secondsLeft! <= 0;
 
   @override
   void initState() {
@@ -76,14 +81,6 @@ class _OrderDetailBodyState extends State<_OrderDetailBody> {
     super.dispose();
   }
 
-  Color _statusColor(String s) {
-    final status = s.toUpperCase();
-    if (status.contains('CANCEL') || status.contains('FAILED')) return AppColors.danger;
-    if (status == 'DELIVERED' || status == 'REFUNDED') return AppColors.secondary;
-    if (status.contains('RETURN')) return AppColors.warning;
-    return AppColors.primary;
-  }
-
   bool get _canCancel {
     const cancellable = {'PAYMENT_PENDING', 'ORDER_RECEIVED', 'ORDER_TAKEN', 'ORDER_PROCESSING', 'DELIVERY_ASSIGNED'};
     return cancellable.contains(widget.order.orderStatus.toUpperCase());
@@ -96,18 +93,15 @@ class _OrderDetailBodyState extends State<_OrderDetailBody> {
     return !s.contains('PENDING') && !s.contains('CANCELLED');
   }
 
-  // ─── Payment countdown ───
-
   Future<void> _loadPaymentStatus() async {
     setState(() => _loadingPaymentStatus = true);
     try {
-      final status = await widget.ref.read(ordersRepositoryProvider).getPaymentStatus(widget.order.id);
+      final status = await ref.read(ordersRepositoryProvider).getPaymentStatus(widget.order.id);
       final seconds = int.tryParse(status['payment_expires_in_seconds']?.toString() ?? '0') ?? 0;
       final expired = status['payment_window_expired'] == true;
       if (mounted) {
         setState(() {
           _loadingPaymentStatus = false;
-          _paymentWindowExpired = expired;
           _secondsLeft = expired ? 0 : seconds;
         });
         if (!expired && seconds > 0) _startCountdown(seconds);
@@ -126,7 +120,7 @@ class _OrderDetailBodyState extends State<_OrderDetailBody> {
         if (_secondsLeft != null && _secondsLeft! > 0) {
           _secondsLeft = _secondsLeft! - 1;
         } else {
-          _paymentWindowExpired = true;
+          _secondsLeft = 0;
           _countdownTimer?.cancel();
         }
       });
@@ -142,28 +136,24 @@ class _OrderDetailBodyState extends State<_OrderDetailBody> {
   Future<void> _completePayment() async {
     setState(() => _completingPayment = true);
     try {
-      final data = await widget.ref.read(ordersRepositoryProvider).retryPayment(widget.order.id);
-      final user = widget.ref.read(authNotifierProvider).user;
+      final data = await ref.read(ordersRepositoryProvider).retryPayment(widget.order.id);
+      final user = ref.read(authNotifierProvider).user;
       _pendingRazorpayOrderId = data['razorpay_order_id']?.toString();
-      final options = {
+      _razorpay.open({
         'key': data['key_id'],
         'amount': data['amount'],
         'currency': 'INR',
         'name': 'New Balan Medical',
         'description': 'Order ${data['order_reference'] ?? widget.order.orderReference ?? ''}',
         'order_id': _pendingRazorpayOrderId,
-        if (user != null) 'prefill': {
-          'name': user.fullName,
-          'contact': user.mobileNumber ?? '',
-        },
+        if (user != null) 'prefill': {'name': user.fullName, 'contact': user.mobileNumber ?? ''},
         'theme': {'color': '#0056B3'},
-      };
-      _razorpay.open(options);
-    } catch (e) {
+      });
+    } catch (_) {
       if (mounted) {
         setState(() => _completingPayment = false);
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Could not resume payment. Please try again.'), backgroundColor: AppColors.danger),
+          const SnackBar(content: Text('Could not resume payment. Please try again.'), backgroundColor: AppColors.danger),
         );
       }
     }
@@ -171,7 +161,7 @@ class _OrderDetailBodyState extends State<_OrderDetailBody> {
 
   void _onPaymentSuccess(PaymentSuccessResponse res) async {
     try {
-      await widget.ref.read(ordersRepositoryProvider).verifyRetryPayment({
+      await ref.read(ordersRepositoryProvider).verifyRetryPayment({
         'razorpay_order_id': _pendingRazorpayOrderId,
         'razorpay_payment_id': res.paymentId,
         'razorpay_signature': res.signature,
@@ -182,7 +172,7 @@ class _OrderDetailBodyState extends State<_OrderDetailBody> {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('Payment successful!'), backgroundColor: AppColors.secondary),
         );
-        widget.ref.invalidate(_orderDetailProvider(widget.order.id));
+        ref.invalidate(_orderDetailProvider(widget.order.id));
       }
     } catch (_) {
       if (mounted) {
@@ -197,7 +187,7 @@ class _OrderDetailBodyState extends State<_OrderDetailBody> {
   void _onPaymentError(PaymentFailureResponse res) async {
     setState(() => _completingPayment = false);
     try {
-      await widget.ref.read(ordersRepositoryProvider).reportCheckoutOutcome(
+      await ref.read(ordersRepositoryProvider).reportCheckoutOutcome(
         widget.order.id, 'failed', errorDescription: res.message,
       );
     } catch (_) {}
@@ -208,20 +198,16 @@ class _OrderDetailBodyState extends State<_OrderDetailBody> {
     }
   }
 
-  // ─── Invoice ───
-
   Future<void> _downloadInvoice() async {
     try {
-      final regularData = await rootBundle.load('assets/fonts/Inter-Regular.ttf');
-      final boldData = await rootBundle.load('assets/fonts/Inter-SemiBold.ttf');
-      final regular = pw.Font.ttf(regularData);
-      final bold = pw.Font.ttf(boldData);
+      _pdfRegularFont ??= pw.Font.ttf(await rootBundle.load('assets/fonts/Inter-Regular.ttf'));
+      _pdfBoldFont ??= pw.Font.ttf(await rootBundle.load('assets/fonts/Inter-SemiBold.ttf'));
+      final regular = _pdfRegularFont!;
+      final bold = _pdfBoldFont!;
 
       final order = widget.order;
       final refNum = order.orderReference ?? order.id.substring(0, 8);
-      final date = order.createdAt != null
-          ? DateFormat('dd MMM yyyy, hh:mm a').format(order.createdAt!.toLocal())
-          : '';
+      final date = order.createdAt != null ? formatOrderDate(order.createdAt!) : '';
 
       final pdf = pw.Document();
       pdf.addPage(pw.Page(
@@ -290,11 +276,10 @@ class _OrderDetailBodyState extends State<_OrderDetailBody> {
             pw.SizedBox(height: 8),
             pw.Divider(color: PdfColors.grey400),
             pw.SizedBox(height: 4),
-            _pdfPriceRow('Subtotal', 'Rs.${order.subtotal.toStringAsFixed(2)}', regular: regular),
-            _pdfPriceRow('Delivery Fee', 'Rs.${order.deliveryFee.toStringAsFixed(2)}', regular: regular),
-            pw.SizedBox(height: 2),
+            _pdfRow('Subtotal', 'Rs.${order.subtotal.toStringAsFixed(2)}', font: regular),
+            _pdfRow('Delivery Fee', 'Rs.${order.deliveryFee.toStringAsFixed(2)}', font: regular),
             pw.Divider(color: PdfColors.grey400),
-            _pdfPriceRow('Total', 'Rs.${order.finalAmount.toStringAsFixed(2)}', regular: bold, isBold: true),
+            _pdfRow('Total', 'Rs.${order.finalAmount.toStringAsFixed(2)}', font: bold),
             pw.Spacer(),
             pw.Center(child: pw.Text('Thank you for shopping with New Balan Medical!',
                 style: pw.TextStyle(font: regular, fontSize: 9, color: PdfColors.grey500))),
@@ -302,31 +287,26 @@ class _OrderDetailBodyState extends State<_OrderDetailBody> {
         ),
       ));
 
-      await Printing.sharePdf(
-        bytes: await pdf.save(),
-        filename: 'invoice_$refNum.pdf',
-      );
-    } catch (e) {
+      await Printing.sharePdf(bytes: await pdf.save(), filename: 'invoice_$refNum.pdf');
+    } catch (_) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Could not generate invoice.'), backgroundColor: AppColors.danger),
+          const SnackBar(content: Text('Could not generate invoice.'), backgroundColor: AppColors.danger),
         );
       }
     }
   }
 
-  pw.Widget _pdfPriceRow(String label, String value, {required pw.Font regular, bool isBold = false}) {
+  pw.Widget _pdfRow(String label, String value, {required pw.Font font}) {
     return pw.Padding(
       padding: const pw.EdgeInsets.symmetric(vertical: 2),
       child: pw.Row(children: [
-        pw.Text(label, style: pw.TextStyle(font: regular, fontSize: 10)),
+        pw.Text(label, style: pw.TextStyle(font: font, fontSize: 10)),
         pw.Spacer(),
-        pw.Text(value, style: pw.TextStyle(font: regular, fontSize: isBold ? 11 : 10)),
+        pw.Text(value, style: pw.TextStyle(font: font, fontSize: 10)),
       ]),
     );
   }
-
-  // ─── Reorder ───
 
   void _reorder() {
     final items = widget.order.items.where((i) => i.brandOfferingId != null).toList();
@@ -337,7 +317,7 @@ class _OrderDetailBodyState extends State<_OrderDetailBody> {
       return;
     }
     for (final item in items) {
-      widget.ref.read(cartProvider.notifier).addItem(CartItem(
+      ref.read(cartProvider.notifier).addItem(CartItem(
         medicineId: item.brandOfferingId!,
         medicineName: item.medicineName,
         brandOfferingId: item.brandOfferingId!,
@@ -346,7 +326,6 @@ class _OrderDetailBodyState extends State<_OrderDetailBody> {
         mrp: item.unitPrice,
         quantity: item.quantity,
         requiresPrescription: false,
-        imageUrl: null,
       ));
     }
     ScaffoldMessenger.of(context).showSnackBar(
@@ -356,25 +335,23 @@ class _OrderDetailBodyState extends State<_OrderDetailBody> {
         action: SnackBarAction(
           label: 'View Cart',
           textColor: Colors.white,
-          onPressed: () => Navigator.of(context).popUntil((r) => r.isFirst),
+          onPressed: () => context.go('/cart'),
         ),
       ),
     );
   }
 
-  // ─── Cancel ───
-
   Future<void> _cancel() async {
     final reason = _reasonCtrl.text.trim();
     setState(() => _cancelling = true);
     try {
-      await widget.ref.read(ordersRepositoryProvider).cancelOrder(
+      await ref.read(ordersRepositoryProvider).cancelOrder(
         widget.order.id, reason.isEmpty ? 'Cancelled by customer' : reason,
       );
       if (mounted) {
-        Navigator.pop(context);
-        Navigator.pop(context);
-        ScaffoldMessenger.of(context).showSnackBar(
+        final messenger = ScaffoldMessenger.of(context);
+        context.pop();
+        messenger.showSnackBar(
           const SnackBar(content: Text('Order cancelled and refund initiated.'), backgroundColor: AppColors.secondary),
         );
       }
@@ -402,9 +379,9 @@ class _OrderDetailBodyState extends State<_OrderDetailBody> {
           ),
         ]),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(context), child: const Text('Keep Order')),
+          TextButton(onPressed: () => context.pop(), child: const Text('Keep Order')),
           ElevatedButton(
-            onPressed: _cancelling ? null : () { Navigator.pop(context); _cancel(); },
+            onPressed: _cancelling ? null : () { context.pop(); _cancel(); },
             style: ElevatedButton.styleFrom(backgroundColor: AppColors.danger),
             child: const Text('Cancel & Refund'),
           ),
@@ -412,8 +389,6 @@ class _OrderDetailBodyState extends State<_OrderDetailBody> {
       ),
     );
   }
-
-  // ─── Prescription ───
 
   String _buildPrescriptionUrl(String path) {
     if (path.startsWith('http://') || path.startsWith('https://')) return path;
@@ -428,36 +403,29 @@ class _OrderDetailBodyState extends State<_OrderDetailBody> {
     if (uri == null) return;
     if (await canLaunchUrl(uri)) {
       await launchUrl(uri, mode: LaunchMode.externalApplication);
-    } else {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Could not open prescription.'), backgroundColor: AppColors.danger),
-        );
-      }
+    } else if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Could not open prescription.'), backgroundColor: AppColors.danger),
+      );
     }
   }
-
-  // ─── Build ───
 
   @override
   Widget build(BuildContext context) {
     final order = widget.order;
     final refNum = order.orderReference ?? order.id.substring(0, 8);
-    final date = order.createdAt != null
-        ? DateFormat('dd MMM yyyy, hh:mm a').format(order.createdAt!.toLocal())
-        : '';
+    final date = order.createdAt != null ? formatOrderDate(order.createdAt!) : '';
     final isPending = order.orderStatus.toUpperCase() == 'PAYMENT_PENDING';
 
     return RefreshIndicator(
-      onRefresh: () => widget.ref.refresh(_orderDetailProvider(order.id).future),
+      onRefresh: () => ref.refresh(_orderDetailProvider(order.id).future),
       child: ListView(
         padding: const EdgeInsets.all(16),
         children: [
-          // Payment pending banner
           if (isPending) ...[
             _PaymentPendingBanner(
               loadingStatus: _loadingPaymentStatus,
-              expired: _paymentWindowExpired,
+              expired: _isExpired,
               secondsLeft: _secondsLeft,
               completing: _completingPayment,
               onComplete: _completePayment,
@@ -466,22 +434,23 @@ class _OrderDetailBodyState extends State<_OrderDetailBody> {
             const SizedBox(height: 12),
           ],
 
-          // Status card
           Card(
             child: Padding(
               padding: const EdgeInsets.all(16),
               child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                 Row(children: [
-                  Text('#$refNum', style: AppTextStyles.h3),
-                  const Spacer(),
+                  Expanded(child: Text('#$refNum', style: AppTextStyles.h3, overflow: TextOverflow.ellipsis)),
+                  const SizedBox(width: 8),
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                    constraints: const BoxConstraints(maxWidth: 190),
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                     decoration: BoxDecoration(
-                      color: _statusColor(order.orderStatus).withOpacity(0.1),
+                      color: orderStatusColor(order.orderStatus).withOpacity(0.1),
                       borderRadius: BorderRadius.circular(8),
                     ),
                     child: Text(order.orderStatus.replaceAll('_', ' '),
-                        style: AppTextStyles.label.copyWith(color: _statusColor(order.orderStatus))),
+                        style: AppTextStyles.label.copyWith(color: orderStatusColor(order.orderStatus)),
+                        overflow: TextOverflow.ellipsis),
                   ),
                 ]),
                 if (date.isNotEmpty) Text(date, style: AppTextStyles.caption),
@@ -498,7 +467,6 @@ class _OrderDetailBodyState extends State<_OrderDetailBody> {
           ),
           const SizedBox(height: 12),
 
-          // Items
           if (order.items.isNotEmpty) ...[
             Text('Items', style: AppTextStyles.h3),
             const SizedBox(height: 8),
@@ -522,26 +490,23 @@ class _OrderDetailBodyState extends State<_OrderDetailBody> {
             const SizedBox(height: 12),
           ],
 
-          // Pricing
           Card(
             child: Padding(
               padding: const EdgeInsets.all(16),
               child: Column(children: [
-                _PriceRow('Subtotal', '₹${order.subtotal.toStringAsFixed(2)}'),
-                _PriceRow('Delivery', '₹${order.deliveryFee.toStringAsFixed(2)}'),
+                PriceRow('Subtotal', '₹${order.subtotal.toStringAsFixed(2)}'),
+                PriceRow('Delivery', '₹${order.deliveryFee.toStringAsFixed(2)}'),
                 const Divider(),
-                _PriceRow('Total', '₹${order.finalAmount.toStringAsFixed(2)}', bold: true),
+                PriceRow('Total', '₹${order.finalAmount.toStringAsFixed(2)}', bold: true),
               ]),
             ),
           ),
 
-          // Refund status
           if (order.payment?.refundStatus != null && order.payment!.refundStatus != 'NONE') ...[
             const SizedBox(height: 12),
             _RefundBanner(payment: order.payment!),
           ],
 
-          // Prescription link
           if (order.prescriptionPath != null && order.prescriptionPath!.isNotEmpty) ...[
             const SizedBox(height: 12),
             OutlinedButton.icon(
@@ -552,7 +517,6 @@ class _OrderDetailBodyState extends State<_OrderDetailBody> {
             ),
           ],
 
-          // Invoice download
           if (_showInvoice) ...[
             const SizedBox(height: 12),
             OutlinedButton.icon(
@@ -563,7 +527,6 @@ class _OrderDetailBodyState extends State<_OrderDetailBody> {
             ),
           ],
 
-          // Reorder
           if (_canReorder) ...[
             const SizedBox(height: 12),
             ElevatedButton.icon(
@@ -574,7 +537,6 @@ class _OrderDetailBodyState extends State<_OrderDetailBody> {
             ),
           ],
 
-          // Cancel
           if (_canCancel) ...[
             const SizedBox(height: 12),
             OutlinedButton(
@@ -661,65 +623,53 @@ class _PaymentPendingBanner extends StatelessWidget {
   }
 }
 
-class _PriceRow extends StatelessWidget {
-  final String label;
-  final String value;
-  final bool bold;
-  const _PriceRow(this.label, this.value, {this.bold = false});
-
-  @override
-  Widget build(BuildContext context) => Padding(
-    padding: const EdgeInsets.symmetric(vertical: 3),
-    child: Row(children: [
-      Text(label, style: bold ? AppTextStyles.label : AppTextStyles.body),
-      const Spacer(),
-      Text(value, style: bold ? AppTextStyles.label : AppTextStyles.body),
-    ]),
-  );
-}
-
 class _RefundBanner extends StatelessWidget {
   final OrderPayment payment;
   const _RefundBanner({required this.payment});
 
+  Color _bannerColor(String status) {
+    if (status == 'COMPLETED') return AppColors.secondary;
+    if (status == 'FAILED') return AppColors.danger;
+    return AppColors.warning;
+  }
+
+  IconData _bannerIcon(String status) {
+    if (status == 'COMPLETED') return Icons.check_circle_outline;
+    if (status == 'FAILED') return Icons.error_outline;
+    return Icons.hourglass_empty;
+  }
+
+  String _bannerTitle(String status) {
+    if (status == 'COMPLETED') return 'Refund Processed';
+    if (status == 'FAILED') return 'Refund Failed';
+    return 'Refund In Progress';
+  }
+
+  String _bannerBody(String status, double? amount) {
+    if (status == 'COMPLETED' && amount != null) return '₹${amount.toStringAsFixed(2)} refunded to your original payment method';
+    if (status == 'FAILED') return 'Please contact support';
+    if (amount != null) return '₹${amount.toStringAsFixed(2)} — takes 5-7 business days';
+    return '';
+  }
+
   @override
   Widget build(BuildContext context) {
     final status = payment.refundStatus?.toUpperCase() ?? '';
-    final isCompleted = status == 'COMPLETED';
-    final isFailed = status == 'FAILED';
-    final amount = payment.refundAmount;
+    final color = _bannerColor(status);
 
     return Container(
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: isCompleted ? AppColors.secondary.withOpacity(0.08)
-            : isFailed ? AppColors.danger.withOpacity(0.08)
-            : AppColors.warning.withOpacity(0.08),
+        color: color.withOpacity(0.08),
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: isCompleted ? AppColors.secondary.withOpacity(0.3)
-            : isFailed ? AppColors.danger.withOpacity(0.3)
-            : AppColors.warning.withOpacity(0.3)),
+        border: Border.all(color: color.withOpacity(0.3)),
       ),
       child: Row(children: [
-        Icon(
-          isCompleted ? Icons.check_circle_outline : isFailed ? Icons.error_outline : Icons.hourglass_empty,
-          color: isCompleted ? AppColors.secondary : isFailed ? AppColors.danger : AppColors.warning,
-          size: 20,
-        ),
+        Icon(_bannerIcon(status), color: color, size: 20),
         const SizedBox(width: 10),
         Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          Text(
-            isCompleted ? 'Refund Processed' : isFailed ? 'Refund Failed' : 'Refund In Progress',
-            style: AppTextStyles.label,
-          ),
-          Text(
-            isCompleted && amount != null
-                ? '₹${amount.toStringAsFixed(2)} refunded to your original payment method'
-                : isFailed
-                    ? 'Please contact support'
-                    : amount != null ? '₹${amount.toStringAsFixed(2)} — takes 5-7 business days' : '',
-            style: AppTextStyles.bodySmall,
-          ),
+          Text(_bannerTitle(status), style: AppTextStyles.label),
+          Text(_bannerBody(status, payment.refundAmount), style: AppTextStyles.bodySmall),
         ])),
       ]),
     );

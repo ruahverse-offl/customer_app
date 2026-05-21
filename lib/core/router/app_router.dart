@@ -13,22 +13,39 @@ import '../../features/orders/presentation/order_detail_screen.dart';
 import '../../features/addresses/presentation/addresses_screen.dart';
 import '../../features/settings/presentation/settings_screen.dart';
 import '../../features/appointments/presentation/appointments_screen.dart';
+import '../../features/clinic/presentation/clinic_screen.dart';
+import '../../features/clinic/presentation/specialist_detail_screen.dart';
+import '../../features/polyclinic/presentation/polyclinic_screen.dart';
+import '../../features/about/presentation/about_screen.dart';
+import '../../features/insurance/presentation/insurance_screen.dart';
+import '../../features/legal/presentation/legal_screens.dart';
 import '../../features/auth/providers/auth_provider.dart';
 import '../shell/main_shell.dart';
 
+class _AuthNotifier extends ChangeNotifier {
+  final Ref _ref;
+  _AuthNotifier(this._ref) {
+    _ref.listen(authNotifierProvider, (_, __) => notifyListeners());
+  }
+
+  static const _publicRoutes = {'/login', '/terms', '/privacy', '/refund-policy'};
+
+  String? redirect(BuildContext context, GoRouterState state) {
+    final isLoggedIn = _ref.read(authNotifierProvider).user != null;
+    final isPublic = _publicRoutes.contains(state.matchedLocation);
+    if (!isLoggedIn && !isPublic) return '/login';
+    if (isLoggedIn && state.matchedLocation == '/login') return '/home';
+    return null;
+  }
+}
+
 final routerProvider = Provider<GoRouter>((ref) {
-  final authState = ref.watch(authNotifierProvider);
+  final notifier = _AuthNotifier(ref);
 
   return GoRouter(
     initialLocation: '/home',
-    redirect: (context, state) {
-      final isLoggedIn = authState.user != null;
-      final isOnAuth = state.matchedLocation == '/login';
-
-      if (!isLoggedIn && !isOnAuth) return '/login';
-      if (isLoggedIn && isOnAuth) return '/home';
-      return null;
-    },
+    refreshListenable: notifier,
+    redirect: notifier.redirect,
     routes: [
       GoRoute(path: '/login', builder: (_, __) => const LoginScreen()),
       ShellRoute(
@@ -58,6 +75,22 @@ final routerProvider = Provider<GoRouter>((ref) {
           GoRoute(path: 'appointments', builder: (_, __) => const AppointmentsScreen()),
         ],
       ),
+      GoRoute(
+        path: '/clinic',
+        builder: (_, __) => const ClinicScreen(),
+        routes: [
+          GoRoute(
+            path: 'specialist/:id',
+            builder: (_, state) => SpecialistDetailScreen(doctorId: state.pathParameters['id']!),
+          ),
+        ],
+      ),
+      GoRoute(path: '/polyclinic', builder: (_, __) => const PolyclinicScreen()),
+      GoRoute(path: '/about', builder: (_, __) => const AboutScreen()),
+      GoRoute(path: '/insurance', builder: (_, __) => const InsuranceScreen()),
+      GoRoute(path: '/terms', builder: (_, __) => const TermsScreen()),
+      GoRoute(path: '/privacy', builder: (_, __) => const PrivacyScreen()),
+      GoRoute(path: '/refund-policy', builder: (_, __) => const RefundScreen()),
     ],
   );
 });

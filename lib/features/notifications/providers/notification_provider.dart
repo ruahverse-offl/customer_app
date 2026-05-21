@@ -4,6 +4,7 @@ import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../../core/api/api_client.dart';
+import '../../auth/providers/auth_provider.dart';
 
 const _kPushEnabledKey = 'nb_push_enabled';
 const _kLastTokenKey = 'nb_last_fcm_token';
@@ -48,6 +49,12 @@ class NotificationPermissionNotifier extends StateNotifier<bool?> {
       FirebaseMessaging.onBackgroundMessage(firebaseMessagingBackgroundHandler);
       _listenForeground();
       FirebaseMessaging.onMessageOpenedApp.listen(_handleTap);
+      FirebaseMessaging.instance.onTokenRefresh.listen((token) async {
+        _pushToken = token;
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.setString(_kLastTokenKey, token);
+        await _register(token);
+      });
 
       final settings = await FirebaseMessaging.instance.getNotificationSettings();
       final granted = settings.authorizationStatus == AuthorizationStatus.authorized;
@@ -153,12 +160,6 @@ class NotificationPermissionNotifier extends StateNotifier<bool?> {
   }
 
   Future<void> _getFcmToken() async {
-    FirebaseMessaging.instance.onTokenRefresh.listen((token) async {
-      _pushToken = token;
-      final prefs = await SharedPreferences.getInstance();
-      await prefs.setString(_kLastTokenKey, token);
-      await _register(token);
-    });
     final token = await FirebaseMessaging.instance.getToken();
     if (token == null) return;
     if (token != _pushToken) {
@@ -170,11 +171,13 @@ class NotificationPermissionNotifier extends StateNotifier<bool?> {
   }
 
   Future<void> _register(String token) async {
+    final user = _ref.read(authNotifierProvider).user;
+    if (user == null || user.roleCode == 'PUBLIC') return;
     try {
       await _ref.read(dioProvider).post('/me/notification-settings', data: {
         'expo_push_token': token,
         'device_platform': defaultTargetPlatform.name.toLowerCase(),
-        'push_enabled': true,
+        'is_push_enabled': true,
       });
     } catch (_) {}
   }

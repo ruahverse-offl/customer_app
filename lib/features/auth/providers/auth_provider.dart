@@ -27,20 +27,55 @@ class AuthNotifier extends StateNotifier<AuthState> {
   Future<void> _restore() async {
     final token = await SecureStorage.getToken();
     if (token == null) return;
+
+    // Restore user from cache immediately — no network needed
+    final cachedJson = await SecureStorage.getUserJson();
+    if (cachedJson != null) {
+      try {
+        final user = AuthUser.fromJson(jsonDecode(cachedJson) as Map<String, dynamic>);
+        if (user.roleCode == 'PUBLIC') {
+          await SecureStorage.clearAll();
+          return;
+        }
+        state = state.copyWith(user: user);
+      } catch (_) {}
+    }
+
+    // Refresh user data in background (don't block navigation)
     try {
       final user = await _repo.getMe();
+      if (user.roleCode == 'PUBLIC') {
+        await SecureStorage.clearAll();
+        state = const AuthState();
+        return;
+      }
+      await SecureStorage.saveUserJson(jsonEncode(user.toJson()));
       state = state.copyWith(user: user);
     } catch (_) {
-      await SecureStorage.clearAll();
+      // Network error — keep cached user. Explicit 401 is handled by API interceptor.
     }
+  }
+
+  Future<void> _persistUser(AuthUser user) async {
+    await SecureStorage.saveUserJson(jsonEncode(user.toJson()));
   }
 
   Future<void> login(String email, String password) async {
     state = state.copyWith(isLoading: true, error: null);
     try {
       final data = await _repo.login(LoginRequest(email: email, password: password));
-      await SecureStorage.saveToken(data['access_token'] as String);
-      final user = await _repo.getMe();
+      final token = (data['token'] ?? data['access_token']).toString();
+      await SecureStorage.saveToken(token);
+      final raw = data['user'];
+      final userMap = raw is Map<String, dynamic> ? raw : <String, dynamic>{};
+      final user = AuthUser(
+        id: (userMap['id'] ?? '').toString(),
+        email: (userMap['email'] ?? email).toString(),
+        fullName: (userMap['full_name'] ?? '').toString(),
+        mobileNumber: userMap['mobile_number']?.toString(),
+        roleCode: (userMap['role_code'] ?? 'CUSTOMER').toString(),
+      );
+      await _persistUser(user);
       state = state.copyWith(user: user, isLoading: false);
     } catch (e) {
       state = state.copyWith(isLoading: false, error: e.toString());
@@ -57,8 +92,18 @@ class AuthNotifier extends StateNotifier<AuthState> {
         password: password,
         mobileNumber: mobile,
       ));
-      await SecureStorage.saveToken(data['access_token'] as String);
-      final user = await _repo.getMe();
+      final token = (data['token'] ?? data['access_token']).toString();
+      await SecureStorage.saveToken(token);
+      final raw = data['user'];
+      final userMap = raw is Map<String, dynamic> ? raw : <String, dynamic>{};
+      final user = AuthUser(
+        id: (userMap['id'] ?? '').toString(),
+        email: (userMap['email'] ?? email).toString(),
+        fullName: (userMap['full_name'] ?? fullName).toString(),
+        mobileNumber: userMap['mobile_number']?.toString(),
+        roleCode: (userMap['role_code'] ?? 'CUSTOMER').toString(),
+      );
+      await _persistUser(user);
       state = state.copyWith(user: user, isLoading: false);
     } catch (e) {
       state = state.copyWith(isLoading: false, error: e.toString());
@@ -73,6 +118,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
   }
 
   void updateLocalUser(AuthUser updated) {
+    _persistUser(updated);
     state = state.copyWith(user: updated);
   }
 }

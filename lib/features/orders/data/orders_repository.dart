@@ -8,7 +8,7 @@ class OrdersRepository {
   const OrdersRepository(this._dio);
 
   Future<({List<Order> items, int total})> getOrders({int limit = 20, int offset = 0}) async {
-    final res = await _dio.get('/orders/', queryParameters: {'limit': limit, 'offset': offset});
+    final res = await _dio.get('/orders', queryParameters: {'limit': limit, 'offset': offset});
     final data = res.data as Map<String, dynamic>;
     final items = (data['items'] as List).map((e) => Order.fromJson(e as Map<String, dynamic>)).toList();
     final total = int.tryParse(data['pagination']?['total']?.toString() ?? '0') ?? 0;

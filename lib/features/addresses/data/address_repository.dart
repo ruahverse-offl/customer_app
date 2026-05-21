@@ -9,8 +9,9 @@ class AddressRepository {
 
   Future<List<Address>> getMyAddresses() async {
     final res = await _dio.get('/addresses/my-addresses');
-    final items = res.data['items'] ?? res.data as List;
-    return (items as List).map((e) => Address.fromJson(e as Map<String, dynamic>)).toList();
+    final raw = res.data;
+    final items = raw is List ? raw : (raw as Map<String, dynamic>)['items'] as List? ?? [];
+    return items.map((e) => Address.fromJson(e as Map<String, dynamic>)).toList();
   }
 
   Future<Address> createAddress(Map<String, dynamic> data) async {

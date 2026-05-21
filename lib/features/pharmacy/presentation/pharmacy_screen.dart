@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../cart/providers/cart_provider.dart';
 import '../data/pharmacy_models.dart';
@@ -77,7 +78,7 @@ class _PharmacyScreenState extends ConsumerState<PharmacyScreen> {
         actions: [
           Stack(
             children: [
-              IconButton(icon: const Icon(Icons.shopping_cart_outlined), onPressed: () {}),
+              IconButton(icon: const Icon(Icons.shopping_cart_outlined), onPressed: () => context.push('/checkout')),
               if (cartCount > 0)
                 Positioned(top: 6, right: 6, child: Container(
                   padding: const EdgeInsets.all(4),
@@ -136,18 +137,33 @@ class _PharmacyScreenState extends ConsumerState<PharmacyScreen> {
                 ),
               ],
             )))
+          else if (state.items.isEmpty)
+            Expanded(
+              child: Center(
+                child: Column(mainAxisSize: MainAxisSize.min, children: [
+                  const Icon(Icons.medication_outlined, size: 56, color: AppColors.textMuted),
+                  const SizedBox(height: 12),
+                  Text('No medicines found', style: AppTextStyles.h3),
+                  const SizedBox(height: 4),
+                  Text('Try a different search or category', style: AppTextStyles.bodySmall),
+                ]),
+              ),
+            )
           else
             Expanded(
-              child: ListView.builder(
+              child: GridView.builder(
                 controller: _scrollCtrl,
-                padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-                itemCount: state.items.length + (state.isLoadingMore ? 1 : 0),
+                padding: const EdgeInsets.fromLTRB(12, 8, 12, 16),
+                gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                  crossAxisCount: 2,
+                  crossAxisSpacing: 10,
+                  mainAxisSpacing: 10,
+                  childAspectRatio: 0.62,
+                ),
+                itemCount: state.items.length + (state.isLoadingMore ? 2 : 0),
                 itemBuilder: (ctx, i) {
                   if (i >= state.items.length) {
-                    return const Center(child: Padding(
-                      padding: EdgeInsets.all(16),
-                      child: CircularProgressIndicator(),
-                    ));
+                    return const Card(child: Center(child: CircularProgressIndicator()));
                   }
                   return MedicineCard(
                     medicine: state.items[i],

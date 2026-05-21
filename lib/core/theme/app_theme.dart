@@ -102,7 +102,7 @@ ThemeData buildAppTheme() {
       labelStyle: AppTextStyles.body.copyWith(color: AppColors.textSecondary),
       hintStyle: AppTextStyles.body.copyWith(color: AppColors.textMuted),
     ),
-    cardTheme: CardTheme(
+    cardTheme: CardThemeData(
       color: AppColors.card,
       elevation: 0,
       shape: RoundedRectangleBorder(

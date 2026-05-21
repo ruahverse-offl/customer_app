@@ -65,6 +65,11 @@ class AccountScreen extends ConsumerWidget {
           _MenuItem(icon: Icons.lock_outline, label: 'Change Password', onTap: () => context.push('/profile/change-password')),
           const SizedBox(height: 8),
           const Divider(),
+          _MenuItem(icon: Icons.description_outlined, label: 'Terms & Conditions', onTap: () => context.push('/terms')),
+          _MenuItem(icon: Icons.privacy_tip_outlined, label: 'Privacy Policy', onTap: () => context.push('/privacy')),
+          _MenuItem(icon: Icons.assignment_return_outlined, label: 'Refund Policy', onTap: () => context.push('/refund-policy')),
+          const SizedBox(height: 8),
+          const Divider(),
           _MenuItem(
             icon: Icons.logout,
             label: 'Sign Out',

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/theme/app_theme.dart';
+import '../../../core/config/app_config.dart';
 import '../data/address_models.dart';
 import '../data/address_repository.dart';
 
@@ -115,22 +116,29 @@ class _AddressCard extends StatelessWidget {
   }
 }
 
-class _AddressFormSheet extends StatefulWidget {
+// Public so checkout screen can open "Add address" inline
+class AddressFormSheet extends StatefulWidget {
   final Address? address;
   final Future<void> Function(Map<String, dynamic>) onSave;
-  const _AddressFormSheet({this.address, required this.onSave});
+  const AddressFormSheet({super.key, this.address, required this.onSave});
   @override
-  State<_AddressFormSheet> createState() => _AddressFormSheetState();
+  State<AddressFormSheet> createState() => _AddressFormSheetState();
 }
 
+// Keep private alias so existing internal call-sites still compile
+typedef _AddressFormSheet = AddressFormSheet;
+
 class _AddressFormSheetState extends State<_AddressFormSheet> {
-  final _line1 = TextEditingController();
-  final _line2 = TextEditingController();
-  final _city = TextEditingController();
-  final _state = TextEditingController();
-  final _pincode = TextEditingController();
+  final _formKey = GlobalKey<FormState>();
+  final _street = TextEditingController();
   final _label = TextEditingController();
   bool _isSaving = false;
+  String? _error;
+
+  // Fixed delivery area — not editable by user
+  late final String _city;
+  late final String _state;
+  late final String _pincode;
 
   @override
   void initState() {
@@ -138,35 +146,38 @@ class _AddressFormSheetState extends State<_AddressFormSheet> {
     final a = widget.address;
     if (a != null) {
       _label.text = a.label;
-      _line1.text = a.addressLine1;
-      _line2.text = a.addressLine2 ?? '';
-      _city.text = a.city;
-      _state.text = a.state;
-      _pincode.text = a.pincode;
+      _street.text = a.street;
+      _city    = a.city.isNotEmpty    ? a.city    : AppConfig.shopCity;
+      _state   = a.state.isNotEmpty   ? a.state   : AppConfig.shopState;
+      _pincode = a.pincode.isNotEmpty ? a.pincode : AppConfig.shopPincode;
+    } else {
+      _city    = AppConfig.shopCity;
+      _state   = AppConfig.shopState;
+      _pincode = AppConfig.shopPincode;
     }
   }
 
   @override
   void dispose() {
-    _line1.dispose(); _line2.dispose(); _city.dispose();
-    _state.dispose(); _pincode.dispose(); _label.dispose();
+    _street.dispose();
+    _label.dispose();
     super.dispose();
   }
 
   Future<void> _save() async {
-    setState(() => _isSaving = true);
+    if (!_formKey.currentState!.validate()) return;
+    setState(() { _isSaving = true; _error = null; });
     try {
       await widget.onSave({
         'label': _label.text.trim().isEmpty ? 'Home' : _label.text.trim(),
-        'address_line_1': _line1.text.trim(),
-        'address_line_2': _line2.text.trim().isEmpty ? null : _line2.text.trim(),
-        'city': _city.text.trim(),
-        'state': _state.text.trim(),
-        'pincode': _pincode.text.trim(),
+        'street': _street.text.trim(),
+        'city': _city,
+        'state': _state,
+        'pincode': _pincode,
       });
       if (mounted) Navigator.pop(context);
-    } catch (_) {
-      if (mounted) setState(() => _isSaving = false);
+    } catch (e) {
+      if (mounted) setState(() { _isSaving = false; _error = e.toString(); });
     }
   }
 
@@ -175,41 +186,85 @@ class _AddressFormSheetState extends State<_AddressFormSheet> {
     return Padding(
       padding: EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom),
       child: DraggableScrollableSheet(
-        initialChildSize: 0.75,
+        initialChildSize: 0.7,
         maxChildSize: 0.95,
         builder: (_, ctrl) => Container(
           decoration: const BoxDecoration(
             color: Colors.white,
             borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
           ),
-          child: ListView(
-            controller: ctrl,
-            padding: const EdgeInsets.all(20),
-            children: [
-              Text(widget.address != null ? 'Edit Address' : 'Add Address', style: AppTextStyles.h3),
-              const SizedBox(height: 20),
-              TextFormField(controller: _label, decoration: const InputDecoration(labelText: 'Label (Home / Work / Other)')),
-              const SizedBox(height: 12),
-              TextFormField(controller: _line1, decoration: const InputDecoration(labelText: 'Address Line 1')),
-              const SizedBox(height: 12),
-              TextFormField(controller: _line2, decoration: const InputDecoration(labelText: 'Address Line 2 (optional)')),
-              const SizedBox(height: 12),
-              Row(children: [
-                Expanded(child: TextFormField(controller: _city, decoration: const InputDecoration(labelText: 'City'))),
-                const SizedBox(width: 12),
-                Expanded(child: TextFormField(controller: _state, decoration: const InputDecoration(labelText: 'State'))),
-              ]),
-              const SizedBox(height: 12),
-              TextFormField(controller: _pincode, keyboardType: TextInputType.number, maxLength: 6,
-                  decoration: const InputDecoration(labelText: 'Pincode', counterText: '')),
-              const SizedBox(height: 24),
-              ElevatedButton(
-                onPressed: _isSaving ? null : _save,
-                child: _isSaving
-                    ? const SizedBox(height: 20, width: 20, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
-                    : Text(widget.address != null ? 'Update Address' : 'Save Address'),
-              ),
-            ],
+          child: Form(
+            key: _formKey,
+            child: ListView(
+              controller: ctrl,
+              padding: const EdgeInsets.all(20),
+              children: [
+                Row(children: [
+                  Text(widget.address != null ? 'Edit Address' : 'Add Address', style: AppTextStyles.h3),
+                  const Spacer(),
+                  IconButton(icon: const Icon(Icons.close), onPressed: () => Navigator.pop(context)),
+                ]),
+                const SizedBox(height: 16),
+                if (_error != null)
+                  Container(
+                    margin: const EdgeInsets.only(bottom: 12),
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: AppColors.danger.withOpacity(0.08),
+                      borderRadius: BorderRadius.circular(10),
+                      border: Border.all(color: AppColors.danger.withOpacity(0.25)),
+                    ),
+                    child: Row(children: [
+                      const Icon(Icons.error_outline, color: AppColors.danger, size: 18),
+                      const SizedBox(width: 8),
+                      Expanded(child: Text(_error!, style: AppTextStyles.bodySmall.copyWith(color: AppColors.danger))),
+                    ]),
+                  ),
+                TextFormField(
+                  controller: _label,
+                  decoration: const InputDecoration(labelText: 'Label', hintText: 'Home / Work / Other'),
+                ),
+                const SizedBox(height: 12),
+                TextFormField(
+                  controller: _street,
+                  decoration: const InputDecoration(
+                    labelText: 'Street Address *',
+                    hintText: 'Door no, Street, Landmark…',
+                  ),
+                  maxLines: 2,
+                  textCapitalization: TextCapitalization.sentences,
+                  validator: (v) => (v == null || v.trim().isEmpty) ? 'Required' : null,
+                ),
+                const SizedBox(height: 16),
+                // Fixed area — shown read-only
+                Container(
+                  padding: const EdgeInsets.all(14),
+                  decoration: BoxDecoration(
+                    color: AppColors.gray100,
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(color: AppColors.border),
+                  ),
+                  child: Row(children: [
+                    const Icon(Icons.lock_outline, size: 16, color: AppColors.textMuted),
+                    const SizedBox(width: 10),
+                    Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                      Text('Delivery Area (fixed)', style: AppTextStyles.caption.copyWith(color: AppColors.textMuted)),
+                      const SizedBox(height: 2),
+                      Text('$_city, $_state — $_pincode', style: AppTextStyles.body),
+                    ])),
+                  ]),
+                ),
+                const SizedBox(height: 24),
+                ElevatedButton(
+                  onPressed: _isSaving ? null : _save,
+                  style: ElevatedButton.styleFrom(minimumSize: const Size(double.infinity, 50)),
+                  child: _isSaving
+                      ? const SizedBox(height: 20, width: 20, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
+                      : Text(widget.address != null ? 'Update Address' : 'Save Address'),
+                ),
+                const SizedBox(height: 12),
+              ],
+            ),
           ),
         ),
       ),

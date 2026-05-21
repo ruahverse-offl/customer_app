@@ -42,9 +42,9 @@ class AuthUser {
   factory AuthUser.fromJson(Map<String, dynamic> json) => AuthUser(
     id: json['id']?.toString() ?? '',
     email: json['email']?.toString() ?? '',
-    fullName: json['full_name']?.toString() ?? '',
-    mobileNumber: json['mobile_number']?.toString(),
-    roleCode: json['role_code']?.toString() ?? 'CUSTOMER',
+    fullName: (json['full_name'] ?? json['fullName'])?.toString() ?? '',
+    mobileNumber: (json['mobile_number'] ?? json['mobileNumber'])?.toString(),
+    roleCode: (json['role_code'] ?? json['roleCode'])?.toString() ?? 'CUSTOMER',
   );
 
   AuthUser copyWith({String? fullName, String? mobileNumber}) => AuthUser(

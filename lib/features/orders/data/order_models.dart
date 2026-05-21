@@ -59,6 +59,7 @@ class Order {
   final DateTime? createdAt;
   final List<OrderItem> items;
   final OrderPayment? payment;
+  final int itemCount;
 
   const Order({
     required this.id,
@@ -74,12 +75,15 @@ class Order {
     this.createdAt,
     this.items = const [],
     this.payment,
+    this.itemCount = 0,
   });
 
   factory Order.fromJson(Map<String, dynamic> j) {
     final order = j['order'] as Map<String, dynamic>? ?? j;
-    final itemsRaw = j['items'] as List? ?? [];
-    final paymentRaw = j['payment'] as Map<String, dynamic>?;
+    final itemsRaw = (j['items'] as List?) ?? (order['items'] as List?) ?? [];
+    final paymentRaw = (j['payment'] ?? order['payment']) as Map<String, dynamic>?;
+    final parsedItems = itemsRaw.map((e) => OrderItem.fromJson(e as Map<String, dynamic>)).toList();
+    final backendCount = int.tryParse((order['item_count'] ?? j['item_count'])?.toString() ?? '');
     return Order(
       id: order['id'].toString(),
       orderReference: order['order_reference']?.toString(),
@@ -92,8 +96,9 @@ class Order {
       returnReason: order['return_reason']?.toString(),
       prescriptionPath: order['prescription_path']?.toString(),
       createdAt: order['created_at'] != null ? DateTime.tryParse(order['created_at'].toString()) : null,
-      items: itemsRaw.map((e) => OrderItem.fromJson(e as Map<String, dynamic>)).toList(),
+      items: parsedItems,
       payment: paymentRaw != null ? OrderPayment.fromJson(paymentRaw) : null,
+      itemCount: backendCount ?? parsedItems.length,
     );
   }
 }
