@@ -23,6 +23,15 @@ class AuthRepository {
     return AuthUser.fromJson(data['user'] ?? data);
   }
 
+  Future<({String accessToken, String? refreshToken})> refreshToken(String refreshToken) async {
+    final res = await _dio.post('/auth/refresh', data: {'refresh_token': refreshToken});
+    final data = res.data as Map<String, dynamic>;
+    return (
+      accessToken: (data['access_token'] ?? data['token'])?.toString() ?? '',
+      refreshToken: data['refresh_token']?.toString(),
+    );
+  }
+
   Future<void> logout() async {
     await _dio.post('/auth/logout');
   }

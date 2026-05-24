@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/storage/secure_storage.dart';
 import '../data/auth_models.dart';
@@ -63,8 +64,45 @@ class AuthNotifier extends StateNotifier<AuthState> {
       }
       await SecureStorage.saveUserJson(jsonEncode(user.toJson()));
       state = state.copyWith(user: user);
+    } on DioException catch (e) {
+      if (e.response?.statusCode == 401) {
+        // Access token expired — try silent refresh before giving up
+        final refreshed = await _tryRefreshToken();
+        if (!refreshed) {
+          await SecureStorage.clearAll();
+          state = const AuthState();
+        }
+      }
+      // Any other error (no internet, timeout, server down): keep cached user logged in
     } catch (_) {
-      // Network error — keep cached user. Explicit 401 is handled by API interceptor.
+      // Keep cached user on unknown errors
+    }
+  }
+
+  /// Silently renews tokens using the stored refresh token.
+  /// Saves both new access token and rotated refresh token.
+  /// Returns true on success.
+  Future<bool> _tryRefreshToken() async {
+    final stored = await SecureStorage.getRefreshToken();
+    if (stored == null) return false;
+    try {
+      final tokens = await _repo.refreshToken(stored);
+      if (tokens.accessToken.isEmpty) return false;
+      await SecureStorage.saveToken(tokens.accessToken);
+      if (tokens.refreshToken != null) await SecureStorage.saveRefreshToken(tokens.refreshToken!);
+      return true;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  // Called by the API interceptor when any mid-session request returns 401
+  Future<void> forceLogout() async {
+    // Try silent refresh first; only hard-logout if refresh also fails
+    final refreshed = await _tryRefreshToken();
+    if (!refreshed) {
+      await SecureStorage.clearAll();
+      state = const AuthState();
     }
   }
 
@@ -77,7 +115,9 @@ class AuthNotifier extends StateNotifier<AuthState> {
     try {
       final data = await _repo.login(LoginRequest(email: email, password: password));
       final token = (data['token'] ?? data['access_token']).toString();
+      final refresh = data['refresh_token']?.toString();
       await SecureStorage.saveToken(token);
+      if (refresh != null) await SecureStorage.saveRefreshToken(refresh);
       final raw = data['user'];
       final userMap = raw is Map<String, dynamic> ? raw : <String, dynamic>{};
       final user = AuthUser(
@@ -105,7 +145,9 @@ class AuthNotifier extends StateNotifier<AuthState> {
         mobileNumber: mobile,
       ));
       final token = (data['token'] ?? data['access_token']).toString();
+      final refresh = data['refresh_token']?.toString();
       await SecureStorage.saveToken(token);
+      if (refresh != null) await SecureStorage.saveRefreshToken(refresh);
       final raw = data['user'];
       final userMap = raw is Map<String, dynamic> ? raw : <String, dynamic>{};
       final user = AuthUser(
@@ -125,8 +167,8 @@ class AuthNotifier extends StateNotifier<AuthState> {
 
   Future<void> logout() async {
     try { await _repo.logout(); } catch (_) {}
-    await SecureStorage.clearAll();
-    state = const AuthState(); // isRestoring=false, user=null → router goes to /login
+    await SecureStorage.clearAll(); // clears token, refresh_token, user json
+    state = const AuthState();
   }
 
   void updateLocalUser(AuthUser updated) {

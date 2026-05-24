@@ -19,7 +19,6 @@ class OrdersScreen extends ConsumerWidget {
     final orders = ref.watch(_ordersProvider);
 
     return Scaffold(
-      backgroundColor: AppColors.surface,
       appBar: AppBar(
         title: const Text('My Orders'),
         backgroundColor: AppColors.primary,

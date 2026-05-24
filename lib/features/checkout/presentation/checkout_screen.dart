@@ -296,13 +296,30 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
 
     return Scaffold(
       appBar: AppBar(title: const Text('Checkout')),
+      bottomNavigationBar: SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(16, 10, 16, 12),
+          child: ElevatedButton(
+            onPressed: _isSubmitting ? null : _placeOrder,
+            style: ElevatedButton.styleFrom(minimumSize: const Size(double.infinity, 54)),
+            child: _isSubmitting
+                ? const SizedBox(height: 22, width: 22, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
+                : Row(mainAxisAlignment: MainAxisAlignment.center, children: [
+                    const Icon(Icons.lock_rounded, size: 18),
+                    const SizedBox(width: 8),
+                    Text('Pay ₹${finalAmount.toStringAsFixed(2)}',
+                        style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w700, fontFamily: 'Outfit')),
+                  ]),
+          ),
+        ),
+      ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(16),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             // Contact
-            _Section(title: 'Contact Details', children: [
+            _Section(title: 'Contact Details', icon: Icons.person_outline_rounded, children: [
               TextFormField(controller: _nameCtrl, decoration: const InputDecoration(labelText: 'Full Name')),
               const SizedBox(height: 12),
               TextFormField(controller: _phoneCtrl, keyboardType: TextInputType.phone,
@@ -310,7 +327,7 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
             ]),
 
             // Delivery address selector
-            _Section(title: 'Delivery Address', children: [
+            _Section(title: 'Delivery Address', icon: Icons.location_on_outlined, children: [
               if (_selectedAddress != null) ...[
                 _AddressTile(address: _selectedAddress!, onTap: _showAddressPicker),
               ] else ...[
@@ -337,7 +354,7 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
 
             // Prescription
             if (cart.hasPrescriptionItems)
-              _Section(title: 'Prescription Required', children: [
+              _Section(title: 'Prescription Required', icon: Icons.description_outlined, children: [
                 if (_prescriptionPath != null)
                   Row(children: [
                     const Icon(Icons.check_circle, color: AppColors.secondary, size: 18),
@@ -363,7 +380,7 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
               ]),
 
             // Coupon
-            _Section(title: 'Coupon Code', children: [
+            _Section(title: 'Coupon Code', icon: Icons.local_offer_outlined, children: [
               if (_isCouponValid)
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
@@ -425,7 +442,7 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
             ]),
 
             // Order note
-            _Section(title: 'Order Note (optional)', children: [
+            _Section(title: 'Order Note (optional)', icon: Icons.edit_note_rounded, children: [
               TextFormField(controller: _noteCtrl, maxLines: 2,
                   decoration: const InputDecoration(
                     labelText: 'Special instructions…',
@@ -434,7 +451,7 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
             ]),
 
             // Order summary
-            _Section(title: 'Order Summary', children: [
+            _Section(title: 'Order Summary', icon: Icons.receipt_long_outlined, children: [
               ...cart.items.map((item) => Padding(
                 padding: const EdgeInsets.only(bottom: 10),
                 child: Row(children: [
@@ -470,16 +487,7 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
                 ),
             ]),
 
-            const SizedBox(height: 20),
-            ElevatedButton(
-              onPressed: _isSubmitting ? null : _placeOrder,
-              style: ElevatedButton.styleFrom(minimumSize: const Size(double.infinity, 52)),
-              child: _isSubmitting
-                  ? const SizedBox(height: 22, width: 22, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
-                  : Text('Pay ₹${finalAmount.toStringAsFixed(2)}',
-                      style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
-            ),
-            const SizedBox(height: 16),
+            const SizedBox(height: 8),
           ],
         ),
       ),
@@ -546,9 +554,9 @@ class _AddressPickerSheet extends StatelessWidget {
     minChildSize: 0.4,
     maxChildSize: 0.85,
     builder: (_, ctrl) => Container(
-      decoration: const BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      decoration: BoxDecoration(
+        color: Theme.of(context).colorScheme.surface,
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
       ),
       child: Column(children: [
         const SizedBox(height: 12),
@@ -646,14 +654,28 @@ class _AddressPickerSheet extends StatelessWidget {
 
 class _Section extends StatelessWidget {
   final String title;
+  final IconData? icon;
   final List<Widget> children;
-  const _Section({required this.title, required this.children});
+  const _Section({required this.title, this.icon, required this.children});
 
   @override
   Widget build(BuildContext context) => Column(
     crossAxisAlignment: CrossAxisAlignment.start,
     children: [
-      Text(title, style: AppTextStyles.h3),
+      Row(children: [
+        if (icon != null) ...[
+          Container(
+            padding: const EdgeInsets.all(6),
+            decoration: BoxDecoration(
+              color: AppColors.primary.withOpacity(0.08),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Icon(icon, size: 16, color: AppColors.primary),
+          ),
+          const SizedBox(width: 8),
+        ],
+        Text(title, style: AppTextStyles.h3),
+      ]),
       const SizedBox(height: 10),
       Card(child: Padding(
         padding: const EdgeInsets.all(16),

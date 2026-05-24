@@ -1,6 +1,7 @@
 import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:pretty_dio_logger/pretty_dio_logger.dart';
+import '../../features/auth/providers/auth_provider.dart';
 import '../config/app_config.dart';
 import '../storage/secure_storage.dart';
 
@@ -41,6 +42,10 @@ class _AuthInterceptor extends Interceptor {
   void onError(DioException err, ErrorInterceptorHandler handler) async {
     if (err.response?.statusCode == 401) {
       await SecureStorage.clearAll();
+      try {
+        // Reset auth state so router redirects to login immediately
+        await _ref.read(authNotifierProvider.notifier).forceLogout();
+      } catch (_) {}
     }
     handler.next(err);
   }

@@ -11,54 +11,80 @@ class SettingsScreen extends ConsumerWidget {
     final notifGranted = ref.watch(notificationPermissionProvider);
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Notification Settings')),
+      appBar: AppBar(title: const Text('Notifications')),
       body: ListView(
         padding: const EdgeInsets.all(16),
         children: [
+          // ── Notifications ────────────────────────────────────────────────
+          _SectionHeader(label: 'NOTIFICATIONS'),
           Card(
             child: Padding(
               padding: const EdgeInsets.all(16),
-              child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                Text('Push Notifications', style: AppTextStyles.h3),
-                const SizedBox(height: 4),
-                Text('Receive updates for orders, deliveries, and promotions.',
-                    style: AppTextStyles.bodySmall),
-                const SizedBox(height: 16),
-                Row(children: [
-                  const Icon(Icons.notifications_outlined, color: AppColors.primary),
-                  const SizedBox(width: 12),
-                  Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                    Text('Order notifications', style: AppTextStyles.label),
-                    Text(
-                      notifGranted == null ? 'Checking…'
-                          : notifGranted ? 'Enabled'
-                          : 'Disabled — tap to enable',
-                      style: AppTextStyles.bodySmall.copyWith(
-                        color: notifGranted == true ? AppColors.secondary : AppColors.textMuted,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(children: [
+                    Container(
+                      padding: const EdgeInsets.all(8),
+                      decoration: BoxDecoration(
+                        color: AppColors.primary.withOpacity(0.1),
+                        borderRadius: BorderRadius.circular(10),
                       ),
+                      child: const Icon(Icons.notifications_outlined, color: AppColors.primary, size: 20),
                     ),
-                  ])),
-                  if (notifGranted == false)
-                    Switch(
-                      value: false,
-                      onChanged: (_) => ref.read(notificationPermissionProvider.notifier).requestPermission(),
-                      activeColor: AppColors.primary,
-                    )
-                  else if (notifGranted == true)
-                    const Icon(Icons.check_circle, color: AppColors.secondary),
-                ]),
-              ]),
+                    const SizedBox(width: 12),
+                    Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                      Text('Order notifications', style: AppTextStyles.label),
+                      Text(
+                        notifGranted == null
+                            ? 'Checking…'
+                            : notifGranted
+                                ? 'Enabled — you\'ll get order updates'
+                                : 'Disabled — tap to enable',
+                        style: AppTextStyles.caption.copyWith(
+                          color: notifGranted == true ? AppColors.secondary : AppColors.textMuted,
+                        ),
+                      ),
+                    ])),
+                    if (notifGranted == false)
+                      Switch(
+                        value: false,
+                        onChanged: (_) =>
+                            ref.read(notificationPermissionProvider.notifier).requestPermission(),
+                        activeColor: AppColors.primary,
+                      )
+                    else if (notifGranted == true)
+                      const Icon(Icons.check_circle_rounded, color: AppColors.secondary),
+                  ]),
+                  if (notifGranted == false) ...[
+                    const SizedBox(height: 14),
+                    OutlinedButton.icon(
+                      onPressed: () =>
+                          ref.read(notificationPermissionProvider.notifier).requestPermission(),
+                      icon: const Icon(Icons.notifications_active_outlined, size: 18),
+                      label: const Text('Enable Notifications'),
+                      style: OutlinedButton.styleFrom(minimumSize: const Size(double.infinity, 44)),
+                    ),
+                  ],
+                ],
+              ),
             ),
           ),
-          const SizedBox(height: 12),
-          if (notifGranted == false)
-            ElevatedButton.icon(
-              onPressed: () => ref.read(notificationPermissionProvider.notifier).requestPermission(),
-              icon: const Icon(Icons.notifications_active_outlined),
-              label: const Text('Enable Notifications'),
-            ),
         ],
       ),
     );
   }
+}
+
+class _SectionHeader extends StatelessWidget {
+  final String label;
+  const _SectionHeader({required this.label});
+
+  @override
+  Widget build(BuildContext context) => Padding(
+    padding: const EdgeInsets.only(left: 4, bottom: 8),
+    child: Text(label,
+        style: AppTextStyles.caption.copyWith(
+            color: AppColors.textMuted, fontWeight: FontWeight.w700, letterSpacing: 0.8, fontSize: 10)),
+  );
 }

@@ -212,80 +212,231 @@ class _OrderDetailBodyState extends ConsumerState<_OrderDetailBody> {
       final refNum = order.orderReference ?? order.id.substring(0, 8);
       final date = order.createdAt != null ? formatOrderDate(order.createdAt!) : '';
 
+      // Load app logo
+      pw.MemoryImage? logoImage;
+      try {
+        final logoBytes = (await rootBundle.load('assets/images/app_icon.png')).buffer.asUint8List();
+        logoImage = pw.MemoryImage(logoBytes);
+      } catch (_) {}
+
+      const primaryColor = PdfColor(0, 0.337, 0.702);   // #0056B3
+      const lightGrey = PdfColor(0.96, 0.97, 0.98);
+      const borderGrey = PdfColor(0.88, 0.91, 0.94);
+
       final pdf = pw.Document();
       pdf.addPage(pw.Page(
         pageFormat: PdfPageFormat.a4,
-        margin: const pw.EdgeInsets.all(36),
+        margin: const pw.EdgeInsets.all(32),
         build: (pw.Context ctx) => pw.Column(
           crossAxisAlignment: pw.CrossAxisAlignment.start,
           children: [
-            pw.Center(child: pw.Column(children: [
-              pw.Text('New Balan Medical', style: pw.TextStyle(font: bold, fontSize: 20)),
-              pw.SizedBox(height: 2),
-              pw.Text('${AppConfig.shopCity}, ${AppConfig.shopState} - ${AppConfig.shopPincode}',
-                  style: pw.TextStyle(font: regular, fontSize: 10, color: PdfColors.grey700)),
-              pw.SizedBox(height: 4),
-              pw.Text('Tax Invoice', style: pw.TextStyle(font: bold, fontSize: 13, color: PdfColors.blueGrey800)),
-            ])),
-            pw.SizedBox(height: 14),
-            pw.Divider(color: PdfColors.grey400),
-            pw.SizedBox(height: 8),
-            pw.Row(mainAxisAlignment: pw.MainAxisAlignment.spaceBetween, children: [
-              pw.Column(crossAxisAlignment: pw.CrossAxisAlignment.start, children: [
-                pw.Text('Order #$refNum', style: pw.TextStyle(font: bold, fontSize: 11)),
-                if (date.isNotEmpty)
-                  pw.Text(date, style: pw.TextStyle(font: regular, fontSize: 9, color: PdfColors.grey600)),
-              ]),
-              pw.Container(
-                padding: const pw.EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                decoration: pw.BoxDecoration(
-                  border: pw.Border.all(color: PdfColors.grey400),
-                  borderRadius: pw.BorderRadius.circular(4),
-                ),
-                child: pw.Text(order.orderStatus.replaceAll('_', ' '),
-                    style: pw.TextStyle(font: regular, fontSize: 9)),
+
+            // ── Header: logo + shop details ──────────────────────────────
+            pw.Container(
+              padding: const pw.EdgeInsets.all(16),
+              decoration: pw.BoxDecoration(
+                color: primaryColor,
+                borderRadius: pw.BorderRadius.circular(8),
               ),
-            ]),
-            if (order.deliveryAddress != null) ...[
-              pw.SizedBox(height: 8),
-              pw.Text('Delivery Address:', style: pw.TextStyle(font: bold, fontSize: 10)),
-              pw.Text(order.deliveryAddress!, style: pw.TextStyle(font: regular, fontSize: 10, color: PdfColors.grey700)),
-            ],
+              child: pw.Row(
+                crossAxisAlignment: pw.CrossAxisAlignment.center,
+                children: [
+                  if (logoImage != null)
+                    pw.Container(
+                      width: 64, height: 64,
+                      decoration: pw.BoxDecoration(
+                        color: PdfColors.white,
+                        borderRadius: pw.BorderRadius.circular(8),
+                      ),
+                      padding: const pw.EdgeInsets.all(4),
+                      child: pw.Image(logoImage, fit: pw.BoxFit.contain),
+                    ),
+                  if (logoImage != null) pw.SizedBox(width: 14),
+                  pw.Expanded(
+                    child: pw.Column(
+                      crossAxisAlignment: pw.CrossAxisAlignment.start,
+                      children: [
+                        pw.Text('NEW BALAN MEDICAL & CLINIC',
+                            style: pw.TextStyle(font: bold, fontSize: 15, color: PdfColors.white)),
+                        pw.SizedBox(height: 3),
+                        pw.Text('120/a Poobalarayapuram 2nd Street',
+                            style: pw.TextStyle(font: regular, fontSize: 9, color: const PdfColor(1, 1, 1, 0.7))),
+                        pw.Text('Thoothukudi, Tamil Nadu 628001',
+                            style: pw.TextStyle(font: regular, fontSize: 9, color: const PdfColor(1, 1, 1, 0.7))),
+                        pw.SizedBox(height: 3),
+                        pw.Text('+91 98948 80598  |  newbalanmedicals@gmail.com',
+                            style: pw.TextStyle(font: regular, fontSize: 9, color: const PdfColor(1, 1, 1, 0.7))),
+                      ],
+                    ),
+                  ),
+                  pw.Column(
+                    crossAxisAlignment: pw.CrossAxisAlignment.end,
+                    children: [
+                      pw.Container(
+                        padding: const pw.EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                        decoration: pw.BoxDecoration(
+                          color: PdfColors.white,
+                          borderRadius: pw.BorderRadius.circular(4),
+                        ),
+                        child: pw.Text('TAX INVOICE',
+                            style: pw.TextStyle(font: bold, fontSize: 11, color: primaryColor)),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+
             pw.SizedBox(height: 14),
-            pw.Divider(color: PdfColors.grey400),
-            pw.SizedBox(height: 6),
-            pw.Row(children: [
-              pw.Expanded(flex: 5, child: pw.Text('Item', style: pw.TextStyle(font: bold, fontSize: 10))),
-              pw.Expanded(flex: 1, child: pw.Text('Qty', style: pw.TextStyle(font: bold, fontSize: 10), textAlign: pw.TextAlign.center)),
-              pw.Expanded(flex: 2, child: pw.Text('Amount', style: pw.TextStyle(font: bold, fontSize: 10), textAlign: pw.TextAlign.right)),
-            ]),
-            pw.SizedBox(height: 4),
-            pw.Divider(color: PdfColors.grey300),
-            ...order.items.map((item) => pw.Padding(
-              padding: const pw.EdgeInsets.symmetric(vertical: 3),
-              child: pw.Row(children: [
-                pw.Expanded(flex: 5, child: pw.Column(crossAxisAlignment: pw.CrossAxisAlignment.start, children: [
-                  pw.Text(item.medicineName, style: pw.TextStyle(font: regular, fontSize: 10)),
-                  if (item.brandName != null)
-                    pw.Text('${item.brandName}${item.packLabel != null ? " - ${item.packLabel}" : ""}',
-                        style: pw.TextStyle(font: regular, fontSize: 9, color: PdfColors.grey600)),
-                ])),
-                pw.Expanded(flex: 1, child: pw.Text('${item.quantity}',
-                    style: pw.TextStyle(font: regular, fontSize: 10), textAlign: pw.TextAlign.center)),
-                pw.Expanded(flex: 2, child: pw.Text('Rs.${item.totalPrice.toStringAsFixed(2)}',
-                    style: pw.TextStyle(font: regular, fontSize: 10), textAlign: pw.TextAlign.right)),
+
+            // ── Invoice metadata ─────────────────────────────────────────
+            pw.Container(
+              padding: const pw.EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+              decoration: pw.BoxDecoration(
+                color: lightGrey,
+                borderRadius: pw.BorderRadius.circular(6),
+                border: pw.Border.all(color: borderGrey),
+              ),
+              child: pw.Row(
+                children: [
+                  pw.Expanded(child: pw.Column(crossAxisAlignment: pw.CrossAxisAlignment.start, children: [
+                    _pdfMetaRow('Invoice No.', '#$refNum', bold: bold, regular: regular),
+                    pw.SizedBox(height: 4),
+                    _pdfMetaRow('Date', date.isNotEmpty ? date : '—', bold: bold, regular: regular),
+                  ])),
+                  pw.Container(width: 1, height: 36, color: borderGrey),
+                  pw.Expanded(child: pw.Padding(
+                    padding: const pw.EdgeInsets.only(left: 12),
+                    child: pw.Column(crossAxisAlignment: pw.CrossAxisAlignment.start, children: [
+                      _pdfMetaRow('Payment', order.payment?.paymentStatus ?? order.orderStatus.replaceAll('_', ' '),
+                          bold: bold, regular: regular),
+                      pw.SizedBox(height: 4),
+                      _pdfMetaRow('Status', order.orderStatus.replaceAll('_', ' '), bold: bold, regular: regular),
+                    ]),
+                  )),
+                ],
+              ),
+            ),
+
+            pw.SizedBox(height: 12),
+
+            // ── Delivery address ─────────────────────────────────────────
+            if (order.deliveryAddress != null)
+              pw.Column(crossAxisAlignment: pw.CrossAxisAlignment.start, children: [
+                pw.Text('Deliver To', style: pw.TextStyle(font: bold, fontSize: 10, color: primaryColor)),
+                pw.SizedBox(height: 4),
+                pw.Text(order.deliveryAddress!,
+                    style: pw.TextStyle(font: regular, fontSize: 10, color: PdfColors.grey700)),
+                pw.SizedBox(height: 12),
               ]),
-            )),
-            pw.SizedBox(height: 8),
-            pw.Divider(color: PdfColors.grey400),
-            pw.SizedBox(height: 4),
-            _pdfRow('Subtotal', 'Rs.${order.subtotal.toStringAsFixed(2)}', font: regular),
-            _pdfRow('Delivery Fee', 'Rs.${order.deliveryFee.toStringAsFixed(2)}', font: regular),
-            pw.Divider(color: PdfColors.grey400),
-            _pdfRow('Total', 'Rs.${order.finalAmount.toStringAsFixed(2)}', font: bold),
+
+            // ── Items table ──────────────────────────────────────────────
+            pw.Container(
+              decoration: pw.BoxDecoration(
+                border: pw.Border.all(color: borderGrey),
+                borderRadius: pw.BorderRadius.circular(6),
+              ),
+              child: pw.Column(children: [
+                // Table header
+                pw.Container(
+                  padding: const pw.EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                  decoration: const pw.BoxDecoration(
+                    color: primaryColor,
+                    borderRadius: pw.BorderRadius.only(
+                      topLeft: pw.Radius.circular(5),
+                      topRight: pw.Radius.circular(5),
+                    ),
+                  ),
+                  child: pw.Row(children: [
+                    pw.Expanded(flex: 5, child: pw.Text('Medicine', style: pw.TextStyle(font: bold, fontSize: 10, color: PdfColors.white))),
+                    pw.Expanded(flex: 1, child: pw.Text('Qty', style: pw.TextStyle(font: bold, fontSize: 10, color: PdfColors.white), textAlign: pw.TextAlign.center)),
+                    pw.Expanded(flex: 2, child: pw.Text('Unit', style: pw.TextStyle(font: bold, fontSize: 10, color: PdfColors.white), textAlign: pw.TextAlign.right)),
+                    pw.Expanded(flex: 2, child: pw.Text('Amount', style: pw.TextStyle(font: bold, fontSize: 10, color: PdfColors.white), textAlign: pw.TextAlign.right)),
+                  ]),
+                ),
+                // Items
+                ...order.items.asMap().entries.map((e) {
+                  final i = e.key;
+                  final item = e.value;
+                  return pw.Container(
+                    color: i.isEven ? PdfColors.white : lightGrey,
+                    padding: const pw.EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+                    child: pw.Row(children: [
+                      pw.Expanded(flex: 5, child: pw.Column(crossAxisAlignment: pw.CrossAxisAlignment.start, children: [
+                        pw.Text(item.medicineName, style: pw.TextStyle(font: regular, fontSize: 10)),
+                        if (item.brandName != null)
+                          pw.Text(
+                            '${item.brandName}${item.packLabel != null ? " · ${item.packLabel}" : ""}',
+                            style: pw.TextStyle(font: regular, fontSize: 8.5, color: PdfColors.grey600),
+                          ),
+                      ])),
+                      pw.Expanded(flex: 1, child: pw.Text('${item.quantity}',
+                          style: pw.TextStyle(font: regular, fontSize: 10), textAlign: pw.TextAlign.center)),
+                      pw.Expanded(flex: 2, child: pw.Text('Rs.${item.unitPrice.toStringAsFixed(2)}',
+                          style: pw.TextStyle(font: regular, fontSize: 10), textAlign: pw.TextAlign.right)),
+                      pw.Expanded(flex: 2, child: pw.Text('Rs.${item.totalPrice.toStringAsFixed(2)}',
+                          style: pw.TextStyle(font: bold, fontSize: 10), textAlign: pw.TextAlign.right)),
+                    ]),
+                  );
+                }),
+              ]),
+            ),
+
+            pw.SizedBox(height: 10),
+
+            // ── Totals ───────────────────────────────────────────────────
+            pw.Align(
+              alignment: pw.Alignment.centerRight,
+              child: pw.Container(
+                width: 220,
+                decoration: pw.BoxDecoration(
+                  border: pw.Border.all(color: borderGrey),
+                  borderRadius: pw.BorderRadius.circular(6),
+                ),
+                child: pw.Column(children: [
+                  _pdfTotalRow('Subtotal', 'Rs.${order.subtotal.toStringAsFixed(2)}', regular: regular),
+                  pw.Divider(color: borderGrey, height: 1),
+                  _pdfTotalRow('Delivery Fee', 'Rs.${order.deliveryFee.toStringAsFixed(2)}', regular: regular),
+                  if (order.subtotal - order.finalAmount + order.deliveryFee > 0) ...[
+                    pw.Divider(color: borderGrey, height: 1),
+                    _pdfTotalRow('Discount',
+                      '- Rs.${(order.subtotal + order.deliveryFee - order.finalAmount).toStringAsFixed(2)}',
+                      regular: regular, valueColor: PdfColors.green700),
+                  ],
+                  pw.Divider(color: borderGrey, height: 1),
+                  pw.Container(
+                    color: primaryColor,
+                    padding: const pw.EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                    child: pw.Row(
+                      mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+                      children: [
+                        pw.Text('TOTAL', style: pw.TextStyle(font: bold, fontSize: 12, color: PdfColors.white)),
+                        pw.Text('Rs.${order.finalAmount.toStringAsFixed(2)}',
+                            style: pw.TextStyle(font: bold, fontSize: 12, color: PdfColors.white)),
+                      ],
+                    ),
+                  ),
+                ]),
+              ),
+            ),
+
             pw.Spacer(),
-            pw.Center(child: pw.Text('Thank you for shopping with New Balan Medical!',
-                style: pw.TextStyle(font: regular, fontSize: 9, color: PdfColors.grey500))),
+
+            // ── Footer ───────────────────────────────────────────────────
+            pw.Divider(color: borderGrey),
+            pw.SizedBox(height: 6),
+            pw.Row(
+              mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+              children: [
+                pw.Text('Thank you for choosing New Balan Medical & Clinic!',
+                    style: pw.TextStyle(font: bold, fontSize: 9, color: primaryColor)),
+                pw.Text('newbalanmedicals@gmail.com',
+                    style: pw.TextStyle(font: regular, fontSize: 9, color: PdfColors.grey600)),
+              ],
+            ),
+            pw.SizedBox(height: 3),
+            pw.Text('This is a computer-generated invoice and does not require a signature.',
+                style: pw.TextStyle(font: regular, fontSize: 8, color: PdfColors.grey500)),
           ],
         ),
       ));
@@ -336,13 +487,19 @@ class _OrderDetailBodyState extends ConsumerState<_OrderDetailBody> {
     }
   }
 
-  pw.Widget _pdfRow(String label, String value, {required pw.Font font}) {
+  pw.Widget _pdfMetaRow(String label, String value, {required pw.Font bold, required pw.Font regular}) {
+    return pw.Row(children: [
+      pw.Text('$label: ', style: pw.TextStyle(font: bold, fontSize: 9, color: PdfColors.grey700)),
+      pw.Text(value, style: pw.TextStyle(font: regular, fontSize: 9)),
+    ]);
+  }
+
+  pw.Widget _pdfTotalRow(String label, String value, {required pw.Font regular, PdfColor? valueColor}) {
     return pw.Padding(
-      padding: const pw.EdgeInsets.symmetric(vertical: 2),
-      child: pw.Row(children: [
-        pw.Text(label, style: pw.TextStyle(font: font, fontSize: 10)),
-        pw.Spacer(),
-        pw.Text(value, style: pw.TextStyle(font: font, fontSize: 10)),
+      padding: const pw.EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+      child: pw.Row(mainAxisAlignment: pw.MainAxisAlignment.spaceBetween, children: [
+        pw.Text(label, style: pw.TextStyle(font: regular, fontSize: 10, color: PdfColors.grey700)),
+        pw.Text(value, style: pw.TextStyle(font: regular, fontSize: 10, color: valueColor)),
       ]),
     );
   }

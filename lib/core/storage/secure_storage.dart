@@ -5,13 +5,17 @@ class SecureStorage {
     aOptions: AndroidOptions(encryptedSharedPreferences: true),
   );
 
-  static const _keyToken    = 'auth_token';
-  static const _keyUserId   = 'user_id';
-  static const _keyRoleCode = 'role_code';
-  static const _keyUserJson = 'auth_user_json';
+  static const _keyToken        = 'auth_token';
+  static const _keyRefreshToken = 'auth_refresh_token';
+  static const _keyUserId       = 'user_id';
+  static const _keyRoleCode     = 'role_code';
+  static const _keyUserJson     = 'auth_user_json';
 
   static Future<void> saveToken(String token) => _storage.write(key: _keyToken, value: token);
   static Future<String?> getToken() => _storage.read(key: _keyToken);
+
+  static Future<void> saveRefreshToken(String token) => _storage.write(key: _keyRefreshToken, value: token);
+  static Future<String?> getRefreshToken() => _storage.read(key: _keyRefreshToken);
 
   static Future<void> saveUserId(String id) => _storage.write(key: _keyUserId, value: id);
   static Future<String?> getUserId() => _storage.read(key: _keyUserId);

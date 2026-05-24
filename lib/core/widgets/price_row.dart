@@ -16,7 +16,7 @@ class PriceRow extends StatelessWidget {
       const Spacer(),
       Text(value,
           style: (bold ? AppTextStyles.label : AppTextStyles.body)
-              .copyWith(color: valueColor ?? (bold ? AppColors.textPrimary : null))),
+              .copyWith(color: valueColor)),
     ]),
   );
 }

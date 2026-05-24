@@ -12,6 +12,7 @@ import '../../features/orders/presentation/orders_screen.dart';
 import '../../features/orders/presentation/order_detail_screen.dart';
 import '../../features/addresses/presentation/addresses_screen.dart';
 import '../../features/settings/presentation/settings_screen.dart';
+import '../../features/appearance/presentation/appearance_screen.dart';
 import '../../features/appointments/presentation/appointments_screen.dart';
 import '../../features/clinic/presentation/clinic_screen.dart';
 import '../../features/clinic/presentation/specialist_detail_screen.dart';
@@ -28,14 +29,21 @@ class _AuthNotifier extends ChangeNotifier {
     _ref.listen(authNotifierProvider, (_, __) => notifyListeners());
   }
 
-  static const _publicRoutes = {'/login', '/terms', '/privacy', '/refund-policy'};
+  // Browsing is allowed without login; only cart/checkout and account require login
+  static const _publicRoutes = {
+    '/login',
+    '/terms', '/privacy', '/refund-policy',
+    '/home', '/pharmacy',
+    '/clinic', '/polyclinic',
+    '/about', '/insurance',
+  };
 
   String? redirect(BuildContext context, GoRouterState state) {
     final authState = _ref.read(authNotifierProvider);
     if (authState.isRestoring) return null; // wait — don't redirect before restore completes
     final isLoggedIn = authState.user != null;
     final isPublic = _publicRoutes.contains(state.matchedLocation);
-    if (!isLoggedIn && !isPublic) return '/login';
+    if (!isLoggedIn && !isPublic) return '/home'; // guest → keep on home, gate at action level
     if (isLoggedIn && state.matchedLocation == '/login') return '/home';
     return null;
   }
@@ -74,6 +82,7 @@ final routerProvider = Provider<GoRouter>((ref) {
           ),
           GoRoute(path: 'addresses', builder: (_, __) => const AddressesScreen()),
           GoRoute(path: 'settings', builder: (_, __) => const SettingsScreen()),
+          GoRoute(path: 'appearance', builder: (_, __) => const AppearanceScreen()),
           GoRoute(path: 'appointments', builder: (_, __) => const AppointmentsScreen()),
         ],
       ),

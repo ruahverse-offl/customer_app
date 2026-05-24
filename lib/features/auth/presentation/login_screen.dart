@@ -103,6 +103,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
     final isLoading = ref.watch(authNotifierProvider).isLoading;
     final mq = MediaQuery.of(context);
 
+    final cs = Theme.of(context).colorScheme;
     return Scaffold(
       backgroundColor: AppColors.primary,
       body: Stack(
@@ -159,12 +160,12 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
 
                 const SizedBox(height: 28),
 
-                // ── White card ───────────────────────────────────────────────
+                // ── Form card ────────────────────────────────────────────────
                 Expanded(
                   child: Container(
-                    decoration: const BoxDecoration(
-                      color: AppColors.surface,
-                      borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+                    decoration: BoxDecoration(
+                      color: cs.surface,
+                      borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
                     ),
                     child: Column(
                       children: [
@@ -173,7 +174,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
                           margin: const EdgeInsets.only(top: 10),
                           width: 36, height: 4,
                           decoration: BoxDecoration(
-                            color: AppColors.gray300,
+                            color: cs.outlineVariant,
                             borderRadius: BorderRadius.circular(2),
                           ),
                         ),
@@ -186,7 +187,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
                             height: 46,
                             padding: const EdgeInsets.all(4),
                             decoration: BoxDecoration(
-                              color: AppColors.gray100,
+                              color: cs.surfaceContainerHighest,
                               borderRadius: BorderRadius.circular(14),
                             ),
                             child: Row(children: [
@@ -378,7 +379,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
             Expanded(
               child: RichText(
                 text: TextSpan(
-                  style: AppTextStyles.bodySmall.copyWith(color: AppColors.textSecondary, height: 1.5),
+                  style: AppTextStyles.bodySmall.copyWith(color: Theme.of(context).colorScheme.onSurfaceVariant, height: 1.5),
                   children: [
                     const TextSpan(text: 'I agree to the '),
                     TextSpan(
@@ -463,7 +464,7 @@ class _TabButton extends StatelessWidget {
           child: Text(
             label,
             style: AppTextStyles.label.copyWith(
-              color: active ? Colors.white : AppColors.textSecondary,
+              color: active ? Colors.white : Theme.of(context).colorScheme.onSurfaceVariant,
             ),
           ),
         ),
