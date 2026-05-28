@@ -304,7 +304,7 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
 
   void _onPaymentError(PaymentFailureResponse res) async {
     final orderId = _pendingPaymentData?['order_id'] as String?;
-    final isCancel = res.code == Razorpay.PAYMENT_CANCEL;
+    final isCancel = res.code == Razorpay.PAYMENT_CANCELLED;
 
     // Tell backend so it can cancel the order / restore stock if window expired
     if (orderId != null) {
