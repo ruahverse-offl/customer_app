@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/config/app_constants.dart';
+import '../../../core/widgets/gradient_button.dart';
 import '../data/insurance_repository.dart';
 
 const _gold = Color(0xFFD97706);
@@ -375,8 +376,18 @@ class _EnquiryForm extends StatelessWidget {
           Expanded(child: TextFormField(
             controller: phoneCtrl,
             keyboardType: TextInputType.phone,
-            decoration: const InputDecoration(labelText: 'Phone *'),
-            validator: (v) => (v?.trim().isEmpty ?? true) ? 'Required' : null,
+            maxLength: 10,
+            decoration: const InputDecoration(
+              labelText: 'Phone *',
+              prefixText: '+91 ',
+              counterText: '',
+            ),
+            validator: (v) {
+              final t = v?.trim() ?? '';
+              if (t.isEmpty) return 'Required';
+              if (t.length != 10 || int.tryParse(t) == null) return 'Enter a valid 10-digit number';
+              return null;
+            },
           )),
         ]),
         const SizedBox(height: 12),
@@ -412,21 +423,23 @@ class _EnquiryForm extends StatelessWidget {
           decoration: const InputDecoration(labelText: 'Message (optional)'),
         ),
         const SizedBox(height: 20),
-        SizedBox(
-          width: double.infinity,
-          child: ElevatedButton.icon(
-            onPressed: submitting ? null : onSubmit,
-            icon: submitting
-                ? const SizedBox(width: 18, height: 18,
-                    child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
-                : const Icon(Icons.send_outlined),
-            label: Text(submitting ? 'Submitting…' : 'Submit Enquiry'),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: _gold,
-              foregroundColor: Colors.white,
-              minimumSize: const Size(double.infinity, 50),
-            ),
+        GradientButton(
+          onPressed: submitting ? null : onSubmit,
+          label: submitting ? 'Submitting…' : 'Submit Enquiry',
+          icon: Icons.send_rounded,
+          loading: submitting,
+          gradient: const LinearGradient(
+            colors: [Color(0xFFD97706), Color(0xFFB45309)],
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
           ),
+          glow: [
+            BoxShadow(
+              color: _gold.withOpacity(0.35),
+              blurRadius: 14,
+              offset: const Offset(0, 6),
+            ),
+          ],
         ),
       ]),
     );

@@ -34,7 +34,10 @@ class AuthNotifier extends StateNotifier<AuthState> {
       return;
     }
 
-    // Restore user from cache immediately so the router can unblock
+    // Restore from cache immediately so the router unblocks without waiting
+    // for the network. If cache is missing but the token is present, leave
+    // isRestoring=true and let the background fetch populate state — this
+    // keeps the user logged in across a cache wipe / app upgrade.
     final cachedJson = await SecureStorage.getUserJson();
     if (cachedJson != null) {
       try {
@@ -46,15 +49,13 @@ class AuthNotifier extends StateNotifier<AuthState> {
         }
         state = AuthState(user: user); // isRestoring=false — unblocks router
       } catch (_) {
-        state = const AuthState();
-        return;
+        // Corrupted cache — fall through to a network fetch.
       }
-    } else {
-      state = const AuthState();
-      return;
     }
 
-    // Refresh user data in background (don't block navigation)
+    // Refresh user data in background. The dio interceptor handles 401 +
+    // silent token refresh + retry transparently; we only need to react if
+    // it bubbles up an error after that.
     try {
       final user = await _repo.getMe();
       if (user.roleCode == 'PUBLIC') {
@@ -66,16 +67,14 @@ class AuthNotifier extends StateNotifier<AuthState> {
       state = state.copyWith(user: user);
     } on DioException catch (e) {
       if (e.response?.statusCode == 401) {
-        // Access token expired — try silent refresh before giving up
-        final refreshed = await _tryRefreshToken();
-        if (!refreshed) {
-          await SecureStorage.clearAll();
-          state = const AuthState();
-        }
+        // Session is genuinely dead — the interceptor already attempted refresh.
+        await SecureStorage.clearAll();
+        state = const AuthState();
       }
-      // Any other error (no internet, timeout, server down): keep cached user logged in
+      // Any other error (no internet, timeout, server down): keep cached user
+      // logged in. They can still see the offline-tolerant parts of the app.
     } catch (_) {
-      // Keep cached user on unknown errors
+      // Keep cached user on unknown errors.
     }
   }
 
@@ -169,6 +168,21 @@ class AuthNotifier extends StateNotifier<AuthState> {
     try { await _repo.logout(); } catch (_) {}
     await SecureStorage.clearAll(); // clears token, refresh_token, user json
     state = const AuthState();
+  }
+
+  /// Permanently delete the user's account. Requires password re-entry.
+  /// On success, clears all local session state — the caller should redirect
+  /// to the login screen.
+  Future<void> deleteAccount({required String password, String? reason}) async {
+    state = state.copyWith(isLoading: true, error: null);
+    try {
+      await _repo.deleteAccount(password: password, reason: reason);
+      await SecureStorage.clearAll();
+      state = const AuthState();
+    } catch (e) {
+      state = state.copyWith(isLoading: false, error: e.toString());
+      rethrow;
+    }
   }
 
   void updateLocalUser(AuthUser updated) {

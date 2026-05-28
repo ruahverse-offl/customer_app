@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/config/app_constants.dart';
+import '../../../core/widgets/status_views.dart';
 import '../data/polyclinic_models.dart';
 import '../data/polyclinic_repository.dart';
 
@@ -86,23 +87,29 @@ class PolyclinicScreen extends ConsumerWidget {
 
           tests.when(
             loading: () => const SliverToBoxAdapter(
-              child: Padding(padding: EdgeInsets.all(40), child: Center(child: CircularProgressIndicator())),
-            ),
-            error: (_, __) => const SliverToBoxAdapter(
               child: Padding(
-                padding: EdgeInsets.all(32),
-                child: Center(child: Text('Could not load tests. Please try again.')),
+                padding: EdgeInsets.symmetric(vertical: 40),
+                child: LoadingView(label: 'Loading tests…'),
+              ),
+            ),
+            error: (_, __) => SliverToBoxAdapter(
+              child: Padding(
+                padding: const EdgeInsets.symmetric(vertical: 32),
+                child: ErrorStateView(
+                  title: 'Could not load tests',
+                  onRetry: () => ref.invalidate(_testsProvider),
+                ),
               ),
             ),
             data: (list) => list.isEmpty
-                ? SliverToBoxAdapter(
+                ? const SliverToBoxAdapter(
                     child: Padding(
-                      padding: const EdgeInsets.all(48),
-                      child: Column(mainAxisSize: MainAxisSize.min, children: [
-                        const Icon(Icons.biotech_outlined, size: 48, color: AppColors.textMuted),
-                        const SizedBox(height: 12),
-                        Text('No tests available at the moment.', style: AppTextStyles.body),
-                      ]),
+                      padding: EdgeInsets.symmetric(vertical: 32),
+                      child: EmptyStateView(
+                        icon: Icons.biotech_outlined,
+                        title: 'No tests available',
+                        message: 'Our test menu will be back soon.',
+                      ),
                     ),
                   )
                 : SliverPadding(

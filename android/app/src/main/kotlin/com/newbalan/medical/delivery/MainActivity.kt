@@ -1,4 +1,4 @@
-package com.newbalan.medical.customer
+package com.newbalan.medical.delivery
 
 import io.flutter.embedding.android.FlutterActivity
 

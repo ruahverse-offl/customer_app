@@ -15,8 +15,6 @@ class SettingsScreen extends ConsumerWidget {
       body: ListView(
         padding: const EdgeInsets.all(16),
         children: [
-          // ── Notifications ────────────────────────────────────────────────
-          _SectionHeader(label: 'NOTIFICATIONS'),
           Card(
             child: Padding(
               padding: const EdgeInsets.all(16),
@@ -76,15 +74,3 @@ class SettingsScreen extends ConsumerWidget {
   }
 }
 
-class _SectionHeader extends StatelessWidget {
-  final String label;
-  const _SectionHeader({required this.label});
-
-  @override
-  Widget build(BuildContext context) => Padding(
-    padding: const EdgeInsets.only(left: 4, bottom: 8),
-    child: Text(label,
-        style: AppTextStyles.caption.copyWith(
-            color: AppColors.textMuted, fontWeight: FontWeight.w700, letterSpacing: 0.8, fontSize: 10)),
-  );
-}

@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:shimmer/shimmer.dart';
 import '../../../core/theme/app_theme.dart';
+import '../../../core/widgets/status_views.dart';
 import '../../cart/providers/cart_provider.dart';
 import '../data/pharmacy_models.dart';
 import '../providers/pharmacy_provider.dart';
@@ -80,6 +81,9 @@ class _PharmacyScreenState extends ConsumerState<PharmacyScreen> {
         title: const Text('Pharmacy'),
         backgroundColor: AppColors.primary,
         foregroundColor: Colors.white,
+        flexibleSpace: const DecoratedBox(
+          decoration: BoxDecoration(gradient: AppGradients.primary),
+        ),
         titleTextStyle: const TextStyle(
           fontFamily: 'Outfit',
           fontWeight: FontWeight.w700,
@@ -194,55 +198,25 @@ class _PharmacyScreenState extends ConsumerState<PharmacyScreen> {
           if (state.isLoading)
             const Expanded(child: _ShimmerGrid())
           else if (state.error != null)
-            Expanded(child: Center(child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Container(
-                  padding: const EdgeInsets.all(20),
-                  decoration: BoxDecoration(
-                    color: AppColors.danger.withOpacity(0.06),
-                    shape: BoxShape.circle,
-                  ),
-                  child: const Icon(Icons.error_outline_rounded, size: 40, color: AppColors.danger),
-                ),
-                const SizedBox(height: 16),
-                Text(state.error!, style: AppTextStyles.body.copyWith(color: AppColors.danger)),
-                const SizedBox(height: 16),
-                ElevatedButton.icon(
-                  onPressed: () => ref.read(medicineListProvider.notifier).load(),
-                  icon: const Icon(Icons.refresh_rounded, size: 18),
-                  label: const Text('Retry'),
-                  style: ElevatedButton.styleFrom(minimumSize: const Size(140, 46)),
-                ),
-              ],
-            )))
+            Expanded(child: ErrorStateView(
+              title: 'Could not load medicines',
+              message: state.error,
+              onRetry: () => ref.read(medicineListProvider.notifier).load(),
+            ))
           else if (state.items.isEmpty)
-            Expanded(child: Center(
-              child: Column(mainAxisSize: MainAxisSize.min, children: [
-                Container(
-                  padding: const EdgeInsets.all(20),
-                  decoration: BoxDecoration(
-                    color: AppColors.primary.withOpacity(0.06),
-                    shape: BoxShape.circle,
-                  ),
-                  child: const Icon(Icons.medication_outlined, size: 40, color: AppColors.textMuted),
-                ),
-                const SizedBox(height: 16),
-                Text('No medicines found', style: AppTextStyles.h3),
-                const SizedBox(height: 6),
-                Text('Try a different search or category', style: AppTextStyles.bodySmall),
-                if (hasFilters) ...[
-                  const SizedBox(height: 16),
-                  TextButton.icon(
-                    onPressed: () {
+            Expanded(child: EmptyStateView(
+              icon: Icons.medication_outlined,
+              title: 'No medicines found',
+              message: hasFilters
+                  ? 'Try a different search or category.'
+                  : 'Our catalog is empty right now. Check back soon.',
+              actionLabel: hasFilters ? 'Clear filters' : null,
+              onAction: hasFilters
+                  ? () {
                       _searchCtrl.clear();
                       ref.read(medicineListProvider.notifier).clearFilters();
-                    },
-                    icon: const Icon(Icons.close_rounded, size: 16),
-                    label: const Text('Clear filters'),
-                  ),
-                ],
-              ]),
+                    }
+                  : null,
             ))
           else
             Expanded(
@@ -412,25 +386,30 @@ class _Chip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final unselectedBorder = isDark ? AppColorsDark.border : AppColors.border;
+    final unselectedLabel = isDark ? AppColorsDark.textPrimary : AppColors.textPrimary;
+
     return GestureDetector(
       onTap: onTap,
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 200),
         margin: const EdgeInsets.only(right: 8),
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 5),
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
         decoration: BoxDecoration(
           color: selected ? AppColors.primary : Colors.transparent,
           borderRadius: BorderRadius.circular(20),
           border: Border.all(
-            color: selected ? AppColors.primary : Theme.of(context).colorScheme.outline,
+            color: selected ? AppColors.primary : unselectedBorder,
+            width: 1.2,
           ),
         ),
         child: Text(
           label,
           style: AppTextStyles.caption.copyWith(
-            color: selected ? Colors.white : Theme.of(context).colorScheme.onSurfaceVariant,
-            fontWeight: selected ? FontWeight.w700 : FontWeight.w400,
-            fontSize: 12,
+            color: selected ? Colors.white : unselectedLabel,
+            fontWeight: selected ? FontWeight.w700 : FontWeight.w600,
+            fontSize: 12.5,
           ),
         ),
       ),

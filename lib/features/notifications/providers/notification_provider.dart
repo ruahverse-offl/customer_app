@@ -65,8 +65,11 @@ class NotificationPermissionNotifier extends StateNotifier<bool?> {
       final initial = await FirebaseMessaging.instance.getInitialMessage();
       if (initial != null) _handleTap(initial);
     } catch (e) {
+      // Firebase unavailable (no google-services.json) or runtime error.
+      // Leave state as null so the home "Allow notifications" banner stays
+      // hidden — there's nothing the user can do until Firebase is wired up.
       if (kDebugMode) print('[NotificationProvider] init error: $e');
-      state = false;
+      state = null;
     }
   }
 

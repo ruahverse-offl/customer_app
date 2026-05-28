@@ -8,14 +8,28 @@ import 'app.dart';
 
 @pragma('vm:entry-point')
 Future<void> _firebaseBackgroundHandler(RemoteMessage message) async {
-  await Firebase.initializeApp();
+  try {
+    await Firebase.initializeApp();
+  } catch (_) {
+    // Firebase isn't configured — drop the message silently. The main isolate
+    // will already have logged the missing config; no need to repeat here.
+  }
 }
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await dotenv.load(fileName: '.env');
   await Hive.initFlutter();
-  await Firebase.initializeApp();
-  FirebaseMessaging.onBackgroundMessage(_firebaseBackgroundHandler);
+
+  // Firebase is optional: if google-services.json is missing the native plugin
+  // skips registration and Firebase.initializeApp() throws. Catching it here
+  // lets the rest of the app boot — push notifications just won't fire.
+  try {
+    await Firebase.initializeApp();
+    FirebaseMessaging.onBackgroundMessage(_firebaseBackgroundHandler);
+  } catch (e) {
+    debugPrint('Firebase init skipped (no google-services.json): $e');
+  }
+
   runApp(const ProviderScope(child: NewBalanApp()));
 }

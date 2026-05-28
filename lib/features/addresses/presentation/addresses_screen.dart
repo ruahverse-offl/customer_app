@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/config/app_config.dart';
+import '../../../core/widgets/gradient_button.dart';
+import '../../../core/widgets/status_views.dart';
 import '../data/address_models.dart';
 import '../data/address_repository.dart';
 
@@ -26,24 +28,27 @@ class AddressesScreen extends ConsumerWidget {
         foregroundColor: Colors.white,
       ),
       body: addresses.when(
-        loading: () => const Center(child: CircularProgressIndicator()),
-        error: (e, _) => Center(child: Text('Failed to load addresses', style: AppTextStyles.body)),
+        loading: () => const LoadingView(),
+        error: (e, _) => ErrorStateView(
+          title: 'Could not load addresses',
+          message: 'Check your connection and try again.',
+          onRetry: () => ref.invalidate(_addressesProvider),
+        ),
         data: (list) => list.isEmpty
-            ? Center(child: Column(mainAxisSize: MainAxisSize.min, children: [
-                const Icon(Icons.location_off_outlined, size: 56, color: AppColors.textMuted),
-                const SizedBox(height: 12),
-                Text('No saved addresses', style: AppTextStyles.h3),
-              ]))
+            ? EmptyStateView(
+                icon: Icons.location_off_outlined,
+                title: 'No saved addresses',
+                message: 'Add a delivery address so we know where to send your orders.',
+                actionLabel: 'Add Address',
+                onAction: () => _showAddressForm(context, ref),
+              )
             : ListView.builder(
                 padding: const EdgeInsets.fromLTRB(16, 16, 16, 80),
                 itemCount: list.length,
                 itemBuilder: (_, i) => _AddressCard(
                   address: list[i],
                   onEdit: () => _showAddressForm(context, ref, address: list[i]),
-                  onDelete: () async {
-                    await ref.read(addressRepositoryProvider).deleteAddress(list[i].id);
-                    ref.invalidate(_addressesProvider);
-                  },
+                  onDelete: () => _confirmDelete(context, ref, list[i]),
                   onSetDefault: () async {
                     await ref.read(addressRepositoryProvider).setDefault(list[i].id);
                     ref.invalidate(_addressesProvider);
@@ -52,6 +57,44 @@ class AddressesScreen extends ConsumerWidget {
               ),
       ),
     );
+  }
+
+  Future<void> _confirmDelete(BuildContext context, WidgetRef ref, Address addr) async {
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Delete address?'),
+        content: Text(
+          addr.isDefault
+              ? '"${addr.label}" is your default delivery address. Removing it means '
+                'you\'ll need to pick a new one at checkout.\n\n${addr.fullAddress}'
+              : 'Remove "${addr.label}" from your saved addresses?\n\n${addr.fullAddress}',
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            style: TextButton.styleFrom(foregroundColor: AppColors.danger),
+            child: const Text('Delete'),
+          ),
+        ],
+      ),
+    );
+    if (ok != true) return;
+    try {
+      await ref.read(addressRepositoryProvider).deleteAddress(addr.id);
+      ref.invalidate(_addressesProvider);
+    } catch (_) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Could not delete address. Please try again.'),
+            backgroundColor: AppColors.danger,
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+    }
   }
 
   void _showAddressForm(BuildContext context, WidgetRef ref, {Address? address}) {
@@ -189,9 +232,9 @@ class _AddressFormSheetState extends State<_AddressFormSheet> {
         initialChildSize: 0.7,
         maxChildSize: 0.95,
         builder: (_, ctrl) => Container(
-          decoration: const BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+          decoration: BoxDecoration(
+            color: Theme.of(context).colorScheme.surface,
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
           ),
           child: Form(
             key: _formKey,
@@ -255,12 +298,11 @@ class _AddressFormSheetState extends State<_AddressFormSheet> {
                   ]),
                 ),
                 const SizedBox(height: 24),
-                ElevatedButton(
+                GradientButton(
                   onPressed: _isSaving ? null : _save,
-                  style: ElevatedButton.styleFrom(minimumSize: const Size(double.infinity, 50)),
-                  child: _isSaving
-                      ? const SizedBox(height: 20, width: 20, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
-                      : Text(widget.address != null ? 'Update Address' : 'Save Address'),
+                  label: widget.address != null ? 'Update Address' : 'Save Address',
+                  icon: Icons.check_rounded,
+                  loading: _isSaving,
                 ),
                 const SizedBox(height: 12),
               ],

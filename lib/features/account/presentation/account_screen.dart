@@ -181,6 +181,13 @@ class AccountScreen extends ConsumerWidget {
                         subtitle: 'Log out of your account',
                         color: AppColors.danger,
                         onTap: () async => ref.read(authNotifierProvider.notifier).logout(),
+                      ),
+                      _MenuItem(
+                        icon: Icons.delete_forever_outlined,
+                        label: 'Delete Account',
+                        subtitle: 'Permanently delete your account & data',
+                        color: AppColors.danger,
+                        onTap: () => context.push('/account/delete'),
                         showDivider: false,
                       ),
                     ],

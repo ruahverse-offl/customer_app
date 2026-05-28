@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../../../core/theme/app_theme.dart';
+import '../../../core/widgets/brand_logo.dart';
 import '../../../core/config/app_config.dart';
 import '../../../core/config/app_constants.dart';
 import '../../auth/providers/auth_provider.dart';
@@ -34,15 +35,20 @@ class HomeScreen extends ConsumerWidget {
             backgroundColor: AppColors.primary,
             foregroundColor: Colors.white,
             elevation: 0,
+            flexibleSpace: const DecoratedBox(
+              decoration: BoxDecoration(gradient: AppGradients.primary),
+            ),
+            titleSpacing: 16,
             title: Row(
               children: [
                 Container(
-                  width: 32, height: 32,
+                  width: 36, height: 36,
+                  padding: const EdgeInsets.all(3),
                   decoration: BoxDecoration(
-                    color: Colors.white.withOpacity(0.2),
-                    borderRadius: BorderRadius.circular(8),
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(9),
                   ),
-                  child: const Icon(Icons.local_pharmacy_rounded, color: Colors.white, size: 18),
+                  child: const BrandLogo(size: 30),
                 ),
                 const SizedBox(width: 10),
                 Column(
@@ -60,6 +66,7 @@ class HomeScreen extends ConsumerWidget {
               IconButton(
                 icon: const Icon(Icons.person_outline_rounded),
                 onPressed: () => context.go('/account'),
+                tooltip: 'Account',
               ),
             ],
           ),
@@ -77,13 +84,7 @@ class HomeScreen extends ConsumerWidget {
                 // ── Hero ─────────────────────────────────────────────────
                 Container(
                   width: double.infinity,
-                  decoration: const BoxDecoration(
-                    gradient: LinearGradient(
-                      colors: [Color(0xFF003585), AppColors.primary, Color(0xFF006FD6)],
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
-                    ),
-                  ),
+                  decoration: const BoxDecoration(gradient: AppGradients.primary),
                   child: Stack(
                     children: [
                       // Background decorative circles
@@ -124,7 +125,7 @@ class HomeScreen extends ConsumerWidget {
                               child: Row(mainAxisSize: MainAxisSize.min, children: [
                                 const Icon(Icons.star_rounded, color: Colors.amber, size: 13),
                                 const SizedBox(width: 5),
-                                Text("Palakkad's Trusted Pharmacy Since 1997",
+                                Text("${AppConfig.shopCity}'s Trusted Pharmacy Since 1997",
                                     style: AppTextStyles.caption.copyWith(
                                         color: Colors.white, fontSize: 10, fontWeight: FontWeight.w600)),
                               ]),
@@ -132,7 +133,7 @@ class HomeScreen extends ConsumerWidget {
                             const SizedBox(height: 14),
                             Text(
                               user != null
-                                  ? 'Hello, ${user.fullName.split(' ').first}! 👋'
+                                  ? 'Hello, ${user.fullName.split(' ').first}.'
                                   : 'Your health,\nour priority.',
                               style: AppTextStyles.h1.copyWith(
                                   color: Colors.white, fontSize: 26, height: 1.2),
@@ -298,8 +299,8 @@ class _BannerCarouselState extends State<_BannerCarousel> {
       icon: Icons.local_shipping_rounded,
       title: 'Free Delivery',
       sub: widget.freeDeliveryThreshold != null
-          ? 'On all orders above ₹${widget.freeDeliveryThreshold!.toStringAsFixed(0)} · Palakkad city'
-          : 'On all orders above ₹500 · Palakkad city',
+          ? 'On all orders above ₹${widget.freeDeliveryThreshold!.toStringAsFixed(0)} · ${AppConfig.shopCity} city'
+          : 'On all orders above ₹500 · ${AppConfig.shopCity} city',
     ),
     (
       colors: [Color(0xFF059669), Color(0xFF047857)],
@@ -477,7 +478,7 @@ class _Stat extends StatelessWidget {
                 )),
             const SizedBox(height: 2),
             Text(label,
-                style: AppTextStyles.caption.copyWith(fontSize: 9, height: 1.3),
+                style: AppTextStyles.caption.copyWith(fontSize: 11, height: 1.25),
                 textAlign: TextAlign.center),
           ],
         ),
@@ -595,12 +596,12 @@ class _PharmacyHighlights extends StatelessWidget {
               const SizedBox(height: 6),
               Text(item.$2,
                   style: AppTextStyles.caption.copyWith(
-                      fontWeight: FontWeight.w700, fontSize: 10),
+                      fontWeight: FontWeight.w700, fontSize: 11),
                   textAlign: TextAlign.center, maxLines: 1,
                   overflow: TextOverflow.ellipsis),
               Text(item.$3,
                   style: AppTextStyles.caption.copyWith(
-                      fontSize: 9, color: AppColors.textMuted),
+                      fontSize: 10, color: AppColors.textMuted),
                   textAlign: TextAlign.center, maxLines: 1,
                   overflow: TextOverflow.ellipsis),
             ])).toList(),

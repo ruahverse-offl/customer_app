@@ -97,9 +97,9 @@ Create a `.env` file in the project root:
 ```env
 API_ORIGIN=https://devapi.newbalanpharmacy.com
 API_PREFIX=/api/v1
-SHOP_CITY=Palakkad
-SHOP_STATE=Kerala
-SHOP_PINCODE=678001
+SHOP_CITY=Thoothukudi
+SHOP_STATE=Tamil Nadu
+SHOP_PINCODE=628001
 ```
 
 If `.env` is absent the app falls back to the defaults above.

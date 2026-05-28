@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 import '../../../core/api/api_client.dart';
 import '../../../core/theme/app_theme.dart';
+import '../../../core/widgets/status_views.dart';
 
 final _appointmentsProvider = FutureProvider.autoDispose<List<Map<String, dynamic>>>((ref) async {
   final dio = ref.watch(dioProvider);
@@ -21,16 +22,17 @@ class AppointmentsScreen extends ConsumerWidget {
     return Scaffold(
       appBar: AppBar(title: const Text('Appointments')),
       body: appts.when(
-        loading: () => const Center(child: CircularProgressIndicator()),
-        error: (e, _) => Center(child: Text('Failed to load appointments', style: AppTextStyles.body)),
+        loading: () => const LoadingView(),
+        error: (e, _) => ErrorStateView(
+          title: 'Could not load appointments',
+          onRetry: () => ref.refresh(_appointmentsProvider.future),
+        ),
         data: (list) => list.isEmpty
-            ? Center(child: Column(mainAxisSize: MainAxisSize.min, children: [
-                const Icon(Icons.calendar_today_outlined, size: 56, color: AppColors.textMuted),
-                const SizedBox(height: 12),
-                Text('No appointments', style: AppTextStyles.h3),
-                const SizedBox(height: 6),
-                Text('Visit our clinic to schedule an appointment', style: AppTextStyles.bodySmall),
-              ]))
+            ? const EmptyStateView(
+                icon: Icons.calendar_today_outlined,
+                title: 'No appointments',
+                message: 'Call us or visit the clinic to schedule an appointment.',
+              )
             : RefreshIndicator(
                 onRefresh: () => ref.refresh(_appointmentsProvider.future),
                 child: ListView.builder(

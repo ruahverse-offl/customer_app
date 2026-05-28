@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/config/app_constants.dart';
+import '../../../core/widgets/status_views.dart';
 import '../data/doctor_models.dart';
 import '../data/doctor_repository.dart';
 
@@ -123,25 +124,28 @@ class ClinicScreen extends ConsumerWidget {
           doctors.when(
             loading: () => const SliverToBoxAdapter(
               child: Padding(
-                padding: EdgeInsets.all(40),
-                child: Center(child: CircularProgressIndicator()),
+                padding: EdgeInsets.symmetric(vertical: 40),
+                child: LoadingView(label: 'Loading specialists…'),
               ),
             ),
-            error: (_, __) => const SliverToBoxAdapter(
+            error: (_, __) => SliverToBoxAdapter(
               child: Padding(
-                padding: EdgeInsets.all(32),
-                child: Center(child: Text('Could not load doctors. Please try again.')),
+                padding: const EdgeInsets.symmetric(vertical: 32),
+                child: ErrorStateView(
+                  title: 'Could not load doctors',
+                  onRetry: () => ref.invalidate(_doctorsProvider),
+                ),
               ),
             ),
             data: (list) => list.isEmpty
-                ? SliverToBoxAdapter(
+                ? const SliverToBoxAdapter(
                     child: Padding(
-                      padding: const EdgeInsets.all(48),
-                      child: Column(mainAxisSize: MainAxisSize.min, children: [
-                        const Icon(Icons.medical_services_outlined, size: 48, color: AppColors.textMuted),
-                        const SizedBox(height: 12),
-                        Text('No doctors available at the moment.', style: AppTextStyles.body),
-                      ]),
+                      padding: EdgeInsets.symmetric(vertical: 32),
+                      child: EmptyStateView(
+                        icon: Icons.medical_services_outlined,
+                        title: 'No doctors available',
+                        message: 'Our specialists will be back soon.',
+                      ),
                     ),
                   )
                 : SliverPadding(

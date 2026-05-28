@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/api/api_client.dart';
 import '../../../core/theme/app_theme.dart';
+import '../../../core/widgets/gradient_button.dart';
 import '../../auth/providers/auth_provider.dart';
 import '../../auth/data/auth_models.dart';
 
@@ -74,7 +75,11 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
             ),
           ),
           const SizedBox(height: 24),
-          TextFormField(controller: _nameCtrl, decoration: const InputDecoration(labelText: 'Full Name', prefixIcon: Icon(Icons.person_outline))),
+          TextFormField(
+            controller: _nameCtrl,
+            decoration: const InputDecoration(labelText: 'Full Name', prefixIcon: Icon(Icons.person_outline)),
+            onChanged: (_) => setState(() {}),
+          ),
           const SizedBox(height: 12),
           TextFormField(controller: _emailCtrl, readOnly: true,
               decoration: const InputDecoration(labelText: 'Email', prefixIcon: Icon(Icons.email_outlined),
@@ -83,11 +88,11 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
           TextFormField(controller: _mobileCtrl, keyboardType: TextInputType.phone, maxLength: 10,
               decoration: const InputDecoration(labelText: 'Mobile Number', prefixIcon: Icon(Icons.phone_outlined), counterText: '')),
           const SizedBox(height: 24),
-          ElevatedButton(
+          GradientButton(
             onPressed: _isSaving ? null : _save,
-            child: _isSaving
-                ? const SizedBox(height: 20, width: 20, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
-                : const Text('Save Changes'),
+            label: 'Save Changes',
+            icon: Icons.save_rounded,
+            loading: _isSaving,
           ),
         ],
       ),

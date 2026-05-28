@@ -1,8 +1,16 @@
+import 'package:dio/dio.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:url_launcher/url_launcher.dart';
+import '../../../core/api/api_client.dart';
+import '../../../core/config/app_config.dart';
+import '../../../core/config/app_constants.dart';
 import '../../../core/theme/app_theme.dart';
+import '../../../core/utils/password_policy.dart';
+import '../../../core/widgets/brand_logo.dart';
+import '../../../core/widgets/gradient_button.dart';
 import '../providers/auth_provider.dart';
 
 class LoginScreen extends ConsumerStatefulWidget {
@@ -47,6 +55,33 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
     super.dispose();
   }
 
+  /// Unwraps a Dio failure into a short, user-readable string.
+  /// Falls back to a generic message if the server didn't send one.
+  String _friendlyError(Object e, {required bool isLogin}) {
+    if (e is DioException) {
+      // Network down / DNS failure / timeout — no response at all.
+      if (e.response == null) {
+        return "Can't reach the server. Check your internet and try again.";
+      }
+      // Auth endpoints map nicely: 401 → wrong creds, 409 → email taken.
+      switch (e.response!.statusCode) {
+        case 401:
+          return 'Invalid email or password.';
+        case 409:
+          return 'An account with this email already exists.';
+        case 422:
+          return 'Please check your details and try again.';
+        case 500:
+        case 502:
+        case 503:
+          return 'Server hiccup. Please try again in a moment.';
+      }
+      // Fall back to the server's `detail` field if present.
+      return apiErrorMessage(e);
+    }
+    return isLogin ? 'Could not sign in. Please try again.' : 'Could not create your account. Please try again.';
+  }
+
   Future<void> _login() async {
     if (!_loginForm.currentState!.validate()) return;
     try {
@@ -55,7 +90,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
       );
       if (mounted) context.go('/home');
     } catch (e) {
-      if (mounted) _showError(e.toString());
+      if (mounted) _showError(_friendlyError(e, isLogin: true));
     }
   }
 
@@ -74,7 +109,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
       );
       if (mounted) context.go('/home');
     } catch (e) {
-      if (mounted) _showError(e.toString());
+      if (mounted) _showError(_friendlyError(e, isLogin: false));
     }
   }
 
@@ -86,6 +121,90 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
         behavior: SnackBarBehavior.floating,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
         margin: const EdgeInsets.all(16),
+      ),
+    );
+  }
+
+  Future<void> _launch(String url) async {
+    final uri = Uri.parse(url);
+    if (await canLaunchUrl(uri)) {
+      await launchUrl(uri, mode: LaunchMode.externalApplication);
+    }
+  }
+
+  void _showForgotPasswordHelp() {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Theme.of(context).colorScheme.surface,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (sheetCtx) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(20, 16, 20, 24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Center(
+                child: Container(
+                  width: 40, height: 4,
+                  decoration: BoxDecoration(
+                    color: AppColors.gray300,
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 16),
+              Container(
+                width: 64, height: 64,
+                decoration: BoxDecoration(
+                  color: AppColors.primary.withOpacity(0.1),
+                  shape: BoxShape.circle,
+                ),
+                alignment: Alignment.center,
+                child: const Icon(Icons.support_agent_rounded, color: AppColors.primary, size: 32),
+              ),
+              const SizedBox(height: 14),
+              Text('Reset Your Password', style: AppTextStyles.h3),
+              const SizedBox(height: 6),
+              Text(
+                "We'll reset your password manually. Reach out to our team and "
+                "we'll verify your identity and set a temporary password.",
+                style: AppTextStyles.body.copyWith(color: AppColors.textSecondary),
+              ),
+              const SizedBox(height: 20),
+              OutlinedButton.icon(
+                onPressed: () {
+                  Navigator.pop(sheetCtx);
+                  _launch(AppConstants.storeWhatsApp);
+                },
+                icon: const Icon(Icons.chat_rounded, size: 18),
+                label: const Text('WhatsApp us'),
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: const Color(0xFF25D366),
+                  side: const BorderSide(color: Color(0xFF25D366)),
+                  minimumSize: const Size(double.infinity, 48),
+                ),
+              ),
+              const SizedBox(height: 10),
+              GradientButton(
+                onPressed: () {
+                  Navigator.pop(sheetCtx);
+                  _launch('tel:${AppConstants.storePhone}');
+                },
+                label: 'Call ${AppConstants.storePhone}',
+                icon: Icons.phone_rounded,
+              ),
+              const SizedBox(height: 12),
+              TextButton(
+                onPressed: () => Navigator.pop(sheetCtx),
+                child: const Text('Cancel'),
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }
@@ -108,16 +227,32 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
       backgroundColor: AppColors.primary,
       body: Stack(
         children: [
-          // Gradient background
+          // Gradient background — mirrors new_balan_fe page header
           Container(
             height: mq.size.height * 0.42,
-            decoration: const BoxDecoration(
-              gradient: LinearGradient(
-                colors: [Color(0xFF003D80), AppColors.primary, Color(0xFF0070E0)],
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
+            decoration: const BoxDecoration(gradient: AppGradients.primary),
+            child: Stack(children: [
+              Positioned(
+                right: -60, top: -40,
+                child: Container(
+                  width: 220, height: 220,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: Colors.white.withOpacity(0.06),
+                  ),
+                ),
               ),
-            ),
+              Positioned(
+                left: -40, top: 80,
+                child: Container(
+                  width: 120, height: 120,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: Colors.white.withOpacity(0.05),
+                  ),
+                ),
+              ),
+            ]),
           ),
 
           SafeArea(
@@ -130,28 +265,35 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
                     opacity: _fadeAnim,
                     child: Column(children: [
                       Container(
-                        width: 76, height: 76,
+                        width: 84, height: 84,
+                        padding: const EdgeInsets.all(8),
                         decoration: BoxDecoration(
-                          color: Colors.white.withOpacity(0.15),
+                          color: Colors.white,
                           borderRadius: BorderRadius.circular(22),
-                          border: Border.all(color: Colors.white.withOpacity(0.3), width: 1.5),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withOpacity(0.2),
+                              blurRadius: 18,
+                              offset: const Offset(0, 8),
+                            ),
+                          ],
                         ),
-                        child: const Icon(Icons.local_pharmacy_rounded, color: Colors.white, size: 42),
+                        child: const BrandLogo(size: 68),
                       ),
-                      const SizedBox(height: 14),
+                      const SizedBox(height: 16),
                       const Text(
                         'New Balan Medical',
                         style: TextStyle(
-                          fontFamily: 'Outfit', fontWeight: FontWeight.w700,
-                          fontSize: 24, color: Colors.white, letterSpacing: 0.2,
+                          fontFamily: 'Outfit', fontWeight: FontWeight.w800,
+                          fontSize: 26, color: Colors.white, letterSpacing: -0.3,
                         ),
                       ),
-                      const SizedBox(height: 4),
+                      const SizedBox(height: 6),
                       Text(
-                        "Palakkad's trusted pharmacy & clinic",
+                        "${AppConfig.shopCity}'s trusted pharmacy & clinic since 1997",
                         style: TextStyle(
                           fontFamily: 'Inter', fontSize: 13,
-                          color: Colors.white.withOpacity(0.8),
+                          color: Colors.white.withOpacity(0.85),
                         ),
                       ),
                     ]),
@@ -271,17 +413,17 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
         ),
         const SizedBox(height: 28),
 
-        ElevatedButton(
+        GradientButton(
           onPressed: isLoading ? null : _login,
-          child: isLoading
-              ? const SizedBox(height: 22, width: 22, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2.5))
-              : const Text('Sign In'),
+          label: 'Sign In',
+          icon: Icons.login_rounded,
+          loading: isLoading,
         ),
-        const SizedBox(height: 16),
+        const SizedBox(height: 12),
 
         Center(
           child: TextButton(
-            onPressed: () {},
+            onPressed: _showForgotPasswordHelp,
             child: Text('Forgot Password?', style: AppTextStyles.label.copyWith(color: AppColors.primary)),
           ),
         ),
@@ -347,6 +489,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
           obscureText: _obscureRegPass,
           textInputAction: TextInputAction.done,
           onFieldSubmitted: (_) => _register(),
+          onChanged: (_) => setState(() {}),
           decoration: InputDecoration(
             labelText: 'Password',
             prefixIcon: const Icon(Icons.lock_outline_rounded),
@@ -355,10 +498,15 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
                   color: AppColors.textMuted),
               onPressed: () => setState(() => _obscureRegPass = !_obscureRegPass),
             ),
-            helperText: 'Minimum 6 characters',
+            helperText: PasswordPolicy.requirementText,
+            helperMaxLines: 3,
           ),
-          validator: (v) => (v == null || v.length < 6) ? 'Minimum 6 characters' : null,
+          validator: PasswordPolicy.validate,
         ),
+        if (_regPassCtrl.text.isNotEmpty) ...[
+          const SizedBox(height: 8),
+          PasswordStrengthMeter(password: _regPassCtrl.text),
+        ],
         const SizedBox(height: 20),
 
         // Terms checkbox
@@ -402,11 +550,11 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
         ),
         const SizedBox(height: 24),
 
-        ElevatedButton(
+        GradientButton(
           onPressed: isLoading ? null : _register,
-          child: isLoading
-              ? const SizedBox(height: 22, width: 22, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2.5))
-              : const Text('Create Account'),
+          label: 'Create Account',
+          icon: Icons.person_add_alt_1_rounded,
+          loading: isLoading,
         ),
         const SizedBox(height: 16),
       ]),

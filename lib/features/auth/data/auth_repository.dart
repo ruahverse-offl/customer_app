@@ -45,6 +45,13 @@ class AuthRepository {
       'new_password': newPassword,
     });
   }
+
+  Future<void> deleteAccount({required String password, String? reason}) async {
+    await _dio.post('/auth/delete-account', data: {
+      'password': password,
+      if (reason != null && reason.trim().isNotEmpty) 'reason': reason.trim(),
+    });
+  }
 }
 
 final authRepositoryProvider = Provider<AuthRepository>((ref) {

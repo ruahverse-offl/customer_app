@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/utils/order_utils.dart';
+import '../../../core/widgets/status_views.dart';
 import '../data/order_models.dart';
 import '../data/orders_repository.dart';
 
@@ -23,23 +24,25 @@ class OrdersScreen extends ConsumerWidget {
         title: const Text('My Orders'),
         backgroundColor: AppColors.primary,
         foregroundColor: Colors.white,
+        flexibleSpace: const DecoratedBox(
+          decoration: BoxDecoration(gradient: AppGradients.primary),
+        ),
       ),
       body: orders.when(
-        loading: () => const Center(child: CircularProgressIndicator()),
-        error: (e, _) => Center(
-          child: Column(mainAxisSize: MainAxisSize.min, children: [
-            const Icon(Icons.error_outline, size: 48, color: AppColors.textMuted),
-            const SizedBox(height: 12),
-            Text('Failed to load orders', style: AppTextStyles.body),
-            const SizedBox(height: 16),
-            TextButton(
-              onPressed: () => ref.refresh(_ordersProvider.future),
-              child: const Text('Retry'),
-            ),
-          ]),
+        loading: () => const LoadingView(label: 'Loading your orders…'),
+        error: (e, _) => ErrorStateView(
+          title: 'Could not load orders',
+          message: 'Check your connection and try again.',
+          onRetry: () => ref.refresh(_ordersProvider.future),
         ),
         data: (list) => list.isEmpty
-            ? _EmptyOrders(onShop: () => context.go('/pharmacy'))
+            ? EmptyStateView(
+                icon: Icons.shopping_bag_outlined,
+                title: 'No orders yet',
+                message: 'Your order history will appear here once you place your first order.',
+                actionLabel: 'Browse Pharmacy',
+                onAction: () => context.go('/pharmacy'),
+              )
             : RefreshIndicator(
                 onRefresh: () => ref.refresh(_ordersProvider.future),
                 child: ListView.builder(
@@ -56,41 +59,6 @@ class OrdersScreen extends ConsumerWidget {
   }
 }
 
-class _EmptyOrders extends StatelessWidget {
-  final VoidCallback onShop;
-  const _EmptyOrders({required this.onShop});
-
-  @override
-  Widget build(BuildContext context) => Center(
-    child: Padding(
-      padding: const EdgeInsets.all(32),
-      child: Column(mainAxisSize: MainAxisSize.min, children: [
-        Container(
-          padding: const EdgeInsets.all(24),
-          decoration: BoxDecoration(
-            color: AppColors.primary.withOpacity(0.06),
-            shape: BoxShape.circle,
-          ),
-          child: const Icon(Icons.shopping_bag_outlined, size: 56, color: AppColors.primary),
-        ),
-        const SizedBox(height: 20),
-        Text('No Orders Yet', style: AppTextStyles.h3),
-        const SizedBox(height: 8),
-        Text('Your order history will appear here once you place your first order.',
-            style: AppTextStyles.body.copyWith(color: AppColors.textSecondary),
-            textAlign: TextAlign.center),
-        const SizedBox(height: 24),
-        ElevatedButton.icon(
-          onPressed: onShop,
-          icon: const Icon(Icons.medication, size: 18),
-          label: const Text('Browse Pharmacy'),
-          style: ElevatedButton.styleFrom(minimumSize: const Size(180, 48)),
-        ),
-      ]),
-    ),
-  );
-}
-
 class _OrderCard extends StatelessWidget {
   final Order order;
   final VoidCallback onTap;
@@ -101,7 +69,7 @@ class _OrderCard extends StatelessWidget {
     final ref = order.orderReference ?? '#${order.id.substring(0, 8).toUpperCase()}';
     final date = order.createdAt != null ? formatOrderDate(order.createdAt!) : '';
     final statusColor = orderStatusColor(order.orderStatus);
-    final statusLabel = order.orderStatus.replaceAll('_', ' ');
+    final statusLabel = orderStatusLabel(order.orderStatus);
     final itemCount = order.itemCount;
     final firstItem = order.items.isNotEmpty ? order.items.first.medicineName : '';
 

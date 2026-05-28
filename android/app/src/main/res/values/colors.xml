@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Brand colors. Keep in sync with lib/core/theme/app_theme.dart. -->
+    <color name="splash_background">#FFFFFFFF</color>
+    <color name="brand_primary">#FF0056B3</color>
+    <color name="brand_primary_dark">#FF004085</color>
+</resources>

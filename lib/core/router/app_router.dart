@@ -6,6 +6,7 @@ import '../../features/home/presentation/home_screen.dart';
 import '../../features/pharmacy/presentation/pharmacy_screen.dart';
 import '../../features/checkout/presentation/checkout_screen.dart';
 import '../../features/account/presentation/account_screen.dart';
+import '../../features/account/presentation/delete_account_screen.dart';
 import '../../features/profile/presentation/profile_screen.dart';
 import '../../features/profile/presentation/change_password_screen.dart';
 import '../../features/orders/presentation/orders_screen.dart';
@@ -64,7 +65,13 @@ final routerProvider = Provider<GoRouter>((ref) {
           GoRoute(path: '/home', builder: (_, __) => const HomeScreen()),
           GoRoute(path: '/pharmacy', builder: (_, __) => const PharmacyScreen()),
           GoRoute(path: '/checkout', builder: (_, __) => const CheckoutScreen()),
-          GoRoute(path: '/account', builder: (_, __) => const AccountScreen()),
+          GoRoute(
+            path: '/account',
+            builder: (_, __) => const AccountScreen(),
+            routes: [
+              GoRoute(path: 'delete', builder: (_, __) => const DeleteAccountScreen()),
+            ],
+          ),
         ],
       ),
       GoRoute(

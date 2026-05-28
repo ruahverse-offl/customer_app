@@ -23,14 +23,8 @@ class AboutScreen extends StatelessWidget {
               titlePadding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
               title: const Text('About Us',
                   style: TextStyle(color: Colors.white, fontSize: 18, fontFamily: 'Outfit', fontWeight: FontWeight.w700)),
-              background: Container(
-                decoration: const BoxDecoration(
-                  gradient: LinearGradient(
-                    colors: [AppColors.primary, AppColors.accent],
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                  ),
-                ),
+              background: const DecoratedBox(
+                decoration: BoxDecoration(gradient: AppGradients.primary),
               ),
             ),
             backgroundColor: AppColors.primary,
@@ -77,7 +71,7 @@ class AboutScreen extends StatelessWidget {
                               child: Row(mainAxisAlignment: MainAxisAlignment.center, children: [
                                 const Icon(Icons.verified, color: Colors.white, size: 12),
                                 const SizedBox(width: 3),
-                                Text('Founder', style: AppTextStyles.caption.copyWith(color: Colors.white, fontSize: 10)),
+                                Text('Founder', style: AppTextStyles.caption.copyWith(color: Colors.white, fontSize: 11, fontWeight: FontWeight.w600)),
                               ]),
                             ),
                           ),
@@ -216,8 +210,8 @@ class _AchievementTile extends StatelessWidget {
           Icon(icon, color: color, size: 20),
           const SizedBox(width: 8),
           Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Text(value, style: AppTextStyles.label.copyWith(color: color, fontSize: 12), maxLines: 1, overflow: TextOverflow.ellipsis),
-            Text(label, style: AppTextStyles.caption.copyWith(fontSize: 9), maxLines: 1, overflow: TextOverflow.ellipsis),
+            Text(value, style: AppTextStyles.label.copyWith(color: color, fontSize: 13), maxLines: 1, overflow: TextOverflow.ellipsis),
+            Text(label, style: AppTextStyles.caption.copyWith(fontSize: 11), maxLines: 1, overflow: TextOverflow.ellipsis),
           ])),
         ]),
       );

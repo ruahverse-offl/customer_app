@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/config/app_constants.dart';
+import '../../../core/widgets/status_views.dart';
 import '../data/doctor_models.dart';
 import '../data/doctor_repository.dart';
 
@@ -27,19 +28,16 @@ class SpecialistDetailScreen extends ConsumerWidget {
     return Scaffold(
       appBar: AppBar(
         title: docAsync.whenOrNull(data: (d) => Text(d.name)) ?? const Text('Specialist'),
-        leading: BackButton(onPressed: () => context.pop()),
         backgroundColor: const Color(0xFF7C3AED),
         foregroundColor: Colors.white,
       ),
       body: docAsync.when(
-        loading: () => const Center(child: CircularProgressIndicator()),
-        error: (_, __) => Center(child: Column(mainAxisSize: MainAxisSize.min, children: [
-          const Icon(Icons.error_outline, size: 48, color: AppColors.textMuted),
-          const SizedBox(height: 12),
-          Text('Could not load specialist details.', style: AppTextStyles.body),
-          const SizedBox(height: 16),
-          TextButton(onPressed: () => context.pop(), child: const Text('Go Back')),
-        ])),
+        loading: () => const LoadingView(),
+        error: (_, __) => ErrorStateView(
+          title: 'Could not load specialist',
+          message: 'Try again, or go back to the doctors list.',
+          onRetry: () => ref.invalidate(_doctorDetailProvider(doctorId)),
+        ),
         data: (doc) => _SpecialistDetail(doc: doc, onCall: _call),
       ),
     );

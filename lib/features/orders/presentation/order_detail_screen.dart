@@ -1,20 +1,19 @@
 import 'dart:async';
-import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import 'package:path_provider/path_provider.dart';
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
-import 'package:permission_handler/permission_handler.dart';
 import 'package:printing/printing.dart';
 import 'package:razorpay_flutter/razorpay_flutter.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../../../core/config/app_config.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/utils/order_utils.dart';
+import '../../../core/widgets/gradient_button.dart';
 import '../../../core/widgets/price_row.dart';
+import '../../../core/widgets/status_views.dart';
 import '../../auth/providers/auth_provider.dart';
 import '../../cart/providers/cart_provider.dart';
 import '../data/order_models.dart';
@@ -38,8 +37,12 @@ class OrderDetailScreen extends ConsumerWidget {
     return Scaffold(
       appBar: AppBar(title: const Text('Order Detail')),
       body: orderAsync.when(
-        loading: () => const Center(child: CircularProgressIndicator()),
-        error: (e, _) => Center(child: Text('Failed to load order', style: AppTextStyles.body)),
+        loading: () => const LoadingView(label: 'Loading order…'),
+        error: (e, _) => ErrorStateView(
+          title: 'Could not load order',
+          message: 'Check your connection and try again.',
+          onRetry: () => ref.refresh(_orderDetailProvider(orderId)),
+        ),
         data: (order) => _OrderDetailBody(order: order),
       ),
     );
@@ -308,10 +311,10 @@ class _OrderDetailBodyState extends ConsumerState<_OrderDetailBody> {
                   pw.Expanded(child: pw.Padding(
                     padding: const pw.EdgeInsets.only(left: 12),
                     child: pw.Column(crossAxisAlignment: pw.CrossAxisAlignment.start, children: [
-                      _pdfMetaRow('Payment', order.payment?.paymentStatus ?? order.orderStatus.replaceAll('_', ' '),
+                      _pdfMetaRow('Payment', order.payment?.paymentStatus ?? orderStatusLabel(order.orderStatus),
                           bold: bold, regular: regular),
                       pw.SizedBox(height: 4),
-                      _pdfMetaRow('Status', order.orderStatus.replaceAll('_', ' '), bold: bold, regular: regular),
+                      _pdfMetaRow('Status', orderStatusLabel(order.orderStatus), bold: bold, regular: regular),
                     ]),
                   )),
                 ],
@@ -372,9 +375,9 @@ class _OrderDetailBodyState extends ConsumerState<_OrderDetailBody> {
                       ])),
                       pw.Expanded(flex: 1, child: pw.Text('${item.quantity}',
                           style: pw.TextStyle(font: regular, fontSize: 10), textAlign: pw.TextAlign.center)),
-                      pw.Expanded(flex: 2, child: pw.Text('Rs.${item.unitPrice.toStringAsFixed(2)}',
+                      pw.Expanded(flex: 2, child: pw.Text('₹${item.unitPrice.toStringAsFixed(2)}',
                           style: pw.TextStyle(font: regular, fontSize: 10), textAlign: pw.TextAlign.right)),
-                      pw.Expanded(flex: 2, child: pw.Text('Rs.${item.totalPrice.toStringAsFixed(2)}',
+                      pw.Expanded(flex: 2, child: pw.Text('₹${item.totalPrice.toStringAsFixed(2)}',
                           style: pw.TextStyle(font: bold, fontSize: 10), textAlign: pw.TextAlign.right)),
                     ]),
                   );
@@ -394,13 +397,13 @@ class _OrderDetailBodyState extends ConsumerState<_OrderDetailBody> {
                   borderRadius: pw.BorderRadius.circular(6),
                 ),
                 child: pw.Column(children: [
-                  _pdfTotalRow('Subtotal', 'Rs.${order.subtotal.toStringAsFixed(2)}', regular: regular),
+                  _pdfTotalRow('Subtotal', '₹${order.subtotal.toStringAsFixed(2)}', regular: regular),
                   pw.Divider(color: borderGrey, height: 1),
-                  _pdfTotalRow('Delivery Fee', 'Rs.${order.deliveryFee.toStringAsFixed(2)}', regular: regular),
+                  _pdfTotalRow('Delivery Fee', '₹${order.deliveryFee.toStringAsFixed(2)}', regular: regular),
                   if (order.subtotal - order.finalAmount + order.deliveryFee > 0) ...[
                     pw.Divider(color: borderGrey, height: 1),
                     _pdfTotalRow('Discount',
-                      '- Rs.${(order.subtotal + order.deliveryFee - order.finalAmount).toStringAsFixed(2)}',
+                      '− ₹${(order.subtotal + order.deliveryFee - order.finalAmount).toStringAsFixed(2)}',
                       regular: regular, valueColor: PdfColors.green700),
                   ],
                   pw.Divider(color: borderGrey, height: 1),
@@ -411,7 +414,7 @@ class _OrderDetailBodyState extends ConsumerState<_OrderDetailBody> {
                       mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
                       children: [
                         pw.Text('TOTAL', style: pw.TextStyle(font: bold, fontSize: 12, color: PdfColors.white)),
-                        pw.Text('Rs.${order.finalAmount.toStringAsFixed(2)}',
+                        pw.Text('₹${order.finalAmount.toStringAsFixed(2)}',
                             style: pw.TextStyle(font: bold, fontSize: 12, color: PdfColors.white)),
                       ],
                     ),
@@ -444,44 +447,14 @@ class _OrderDetailBodyState extends ConsumerState<_OrderDetailBody> {
       final bytes = await pdf.save();
       final filename = 'invoice_$refNum.pdf';
 
-      final saveDir = await _resolveInvoiceDir();
-      if (saveDir == null) {
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: const Text('Storage permission denied. Grant "All files access" in Settings.'),
-              backgroundColor: AppColors.danger,
-              action: SnackBarAction(
-                label: 'Settings',
-                textColor: Colors.white,
-                onPressed: openAppSettings,
-              ),
-            ),
-          );
-        }
-        return;
-      }
-
-      if (!await saveDir.exists()) await saveDir.create(recursive: true);
-      await File('${saveDir.path}/$filename').writeAsBytes(bytes);
-
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Saved to NEWBALAN/Invoices/$filename'),
-            backgroundColor: AppColors.secondary,
-            action: SnackBarAction(
-              label: 'Share',
-              textColor: Colors.white,
-              onPressed: () => Printing.sharePdf(bytes: bytes, filename: filename),
-            ),
-          ),
-        );
-      }
+      // Open the system share sheet so the user can save anywhere (Drive,
+      // Downloads via SAF, WhatsApp, email…). No storage permission needed —
+      // this avoids the MANAGE_EXTERNAL_STORAGE Play policy blocker.
+      await Printing.sharePdf(bytes: bytes, filename: filename);
     } catch (_) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Could not save invoice.'), backgroundColor: AppColors.danger),
+          const SnackBar(content: Text('Could not generate invoice.'), backgroundColor: AppColors.danger),
         );
       }
     }
@@ -502,45 +475,6 @@ class _OrderDetailBodyState extends ConsumerState<_OrderDetailBody> {
         pw.Text(value, style: pw.TextStyle(font: regular, fontSize: 10, color: valueColor)),
       ]),
     );
-  }
-
-  /// Returns the NEWBALAN/Invoices directory on the device's primary storage.
-  /// Uses getExternalStorageDirectory() to derive the correct root — no hardcoded paths.
-  /// Returns null if permission is denied.
-  Future<Directory?> _resolveInvoiceDir() async {
-    if (Platform.isIOS) {
-      final base = await getApplicationDocumentsDirectory();
-      return Directory('${base.path}/NEWBALAN/Invoices');
-    }
-
-    // Derive the storage root from the app-specific external path.
-    // e.g. /storage/emulated/0/Android/data/com.pkg/files → /storage/emulated/0
-    final appExtDir = await getExternalStorageDirectory();
-    if (appExtDir == null) return null;
-    final storageRoot = appExtDir.path.split('/Android').first;
-
-    Future<Directory> targetDir() => Future.value(
-      Directory('$storageRoot/NEWBALAN/Invoices'),
-    );
-
-    // Android 11+ (API 30+): MANAGE_EXTERNAL_STORAGE for arbitrary paths
-    if (await Permission.manageExternalStorage.isGranted) {
-      return targetDir();
-    }
-
-    // Android 9-10: WRITE_EXTERNAL_STORAGE is enough
-    final storageStatus = await Permission.storage.request();
-    if (storageStatus.isGranted) {
-      return targetDir();
-    }
-
-    // Android 11+: request MANAGE_EXTERNAL_STORAGE (opens the Settings page once)
-    await Permission.manageExternalStorage.request();
-    if (await Permission.manageExternalStorage.isGranted) {
-      return targetDir();
-    }
-
-    return null; // permission denied
   }
 
   void _reorder() {
@@ -570,7 +504,7 @@ class _OrderDetailBodyState extends ConsumerState<_OrderDetailBody> {
         action: SnackBarAction(
           label: 'View Cart',
           textColor: Colors.white,
-          onPressed: () => context.go('/cart'),
+          onPressed: () => context.go('/checkout'),
         ),
       ),
     );
@@ -677,15 +611,15 @@ class _OrderDetailBodyState extends ConsumerState<_OrderDetailBody> {
                   Expanded(child: Text('#$refNum', style: AppTextStyles.h3, overflow: TextOverflow.ellipsis)),
                   const SizedBox(width: 8),
                   Container(
-                    constraints: const BoxConstraints(maxWidth: 190),
                     padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                     decoration: BoxDecoration(
                       color: orderStatusColor(order.orderStatus).withOpacity(0.1),
                       borderRadius: BorderRadius.circular(8),
                     ),
-                    child: Text(order.orderStatus.replaceAll('_', ' '),
-                        style: AppTextStyles.label.copyWith(color: orderStatusColor(order.orderStatus)),
-                        overflow: TextOverflow.ellipsis),
+                    child: Text(
+                      orderStatusLabel(order.orderStatus),
+                      style: AppTextStyles.label.copyWith(color: orderStatusColor(order.orderStatus)),
+                    ),
                   ),
                 ]),
                 if (date.isNotEmpty) Text(date, style: AppTextStyles.caption),
@@ -764,25 +698,28 @@ class _OrderDetailBodyState extends ConsumerState<_OrderDetailBody> {
 
           if (_canReorder) ...[
             const SizedBox(height: 12),
-            ElevatedButton.icon(
+            GradientButton.secondary(
               onPressed: _reorder,
-              icon: const Icon(Icons.shopping_cart_outlined, size: 18),
-              label: const Text('Reorder'),
-              style: ElevatedButton.styleFrom(backgroundColor: AppColors.secondary),
+              label: 'Reorder',
+              icon: Icons.shopping_cart_rounded,
             ),
           ],
 
           if (_canCancel) ...[
             const SizedBox(height: 12),
-            OutlinedButton(
+            OutlinedButton.icon(
               onPressed: _cancelling ? null : _showCancelDialog,
+              icon: _cancelling
+                  ? const SizedBox(
+                      height: 18, width: 18,
+                      child: CircularProgressIndicator(strokeWidth: 2, color: AppColors.danger),
+                    )
+                  : const Icon(Icons.cancel_outlined, size: 18),
+              label: const Text('Cancel Order & Refund'),
               style: OutlinedButton.styleFrom(
                 foregroundColor: AppColors.danger,
                 side: const BorderSide(color: AppColors.danger),
               ),
-              child: _cancelling
-                  ? const SizedBox(height: 20, width: 20, child: CircularProgressIndicator(strokeWidth: 2, color: AppColors.danger))
-                  : const Text('Cancel Order & Refund'),
             ),
           ],
           const SizedBox(height: 24),

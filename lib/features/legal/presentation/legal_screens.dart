@@ -2,6 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import '../../../core/theme/app_theme.dart';
 
+/// Bumped whenever any legal screen's content materially changes.
+/// Keep in sync with the website's PrivacyPolicy.jsx footer.
+const _legalLastUpdated = 'May 2026';
+
 // ── shared widget ─────────────────────────────────────────────────────────────
 
 class _LegalPage extends StatelessWidget {
@@ -23,19 +27,17 @@ class _LegalPage extends StatelessWidget {
             flexibleSpace: FlexibleSpaceBar(
               titlePadding: const EdgeInsets.fromLTRB(56, 0, 16, 16),
               title: Text(title, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700, fontFamily: 'Outfit')),
-              background: Container(
-                decoration: const BoxDecoration(
-                  gradient: LinearGradient(
-                    colors: [Color(0xFF003D80), AppColors.primary],
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                  ),
-                ),
+              background: DecoratedBox(
+                decoration: const BoxDecoration(gradient: AppGradients.primary),
                 child: Align(
-                  alignment: Alignment.bottomLeft,
+                  alignment: Alignment.bottomCenter,
                   child: Padding(
-                    padding: const EdgeInsets.fromLTRB(56, 0, 16, 44),
-                    child: Text(subtitle, style: const TextStyle(color: Colors.white70, fontSize: 12, fontFamily: 'Inter')),
+                    padding: const EdgeInsets.fromLTRB(20, 0, 20, 44),
+                    child: Text(
+                      subtitle,
+                      textAlign: TextAlign.center,
+                      style: const TextStyle(color: Colors.white70, fontSize: 12, fontFamily: 'Inter'),
+                    ),
                   ),
                 ),
               ),
@@ -50,7 +52,7 @@ class _LegalPage extends StatelessWidget {
                   // Footer
                   return Padding(
                     padding: const EdgeInsets.only(top: 8, bottom: 24),
-                    child: Text('Last Updated: January 2026',
+                    child: Text('Last Updated: $_legalLastUpdated',
                         style: AppTextStyles.caption, textAlign: TextAlign.center),
                   );
                 },
@@ -195,66 +197,133 @@ class PrivacyScreen extends StatelessWidget {
     subtitle: 'How we collect, use, and protect your information.',
     sections: const [
       _Section(
-        heading: '1. Information We Collect',
-        paragraphs: ['We collect information you provide when you:'],
-        bullets: [
-          'Create an account or register',
-          'Place an order for medicines or services',
-          'Upload prescriptions or medical documents',
-          'Contact us via phone, email, or WhatsApp',
+        heading: '1. Who We Are',
+        paragraphs: [
+          'NEW BALAN Medical & Clinic ("we", "us", "New Balan") operates a licensed retail pharmacy, polyclinic services, and the New Balan Medical mobile app. This policy explains what personal information we collect through the app and our services, how we use it, who we share it with, and the rights you have over it.',
+          'This policy is governed by the Digital Personal Data Protection Act, 2023 (India) and applicable consumer-protection and pharmacy regulations.',
         ],
       ),
       _Section(
-        heading: '2. How We Use Your Information',
+        heading: '2. Information We Collect',
+        paragraphs: ['We collect the following categories of information:'],
         bullets: [
-          'Process and fulfill your medicine orders',
-          'Verify prescriptions and ensure compliance',
-          'Communicate about your orders and account',
-          'Improve our services and user experience',
-          'Detect and prevent fraud and security threats',
-          'Comply with legal and regulatory requirements',
+          'Account info: full name, email address, mobile number, hashed password.',
+          'Health data: prescription images or PDFs you upload, the medicines on those prescriptions, and information needed to fulfil your order.',
+          'Order info: items purchased, quantities, prices, delivery address, order notes, special instructions.',
+          'Payment info: handled by Razorpay (see §4). We do NOT store your card or UPI credentials on our servers.',
+          'Device info: a Firebase Cloud Messaging (FCM) token used to send order-status push notifications, plus app version and device type to diagnose problems.',
+          'Diagnostic info: crash reports and basic app activity (which screens are visited, when the app last opened) for troubleshooting.',
         ],
       ),
       _Section(
-        heading: '3. Information Sharing',
-        paragraphs: ['We do not sell your personal information. We may share it only with:'],
+        heading: '3. How We Use Your Information',
         bullets: [
-          'Service providers assisting in operating our services',
-          'Licensed pharmacists and doctors for prescription verification',
-          'Legal authorities when required by law',
+          'Fulfil your medicine orders and dispatch deliveries to your address.',
+          'Verify prescriptions and comply with the rules of the Drugs and Cosmetics Act.',
+          'Send push notifications and emails about your order status, delivery updates, and refund confirmations.',
+          'Provide customer support over phone, WhatsApp, and email.',
+          'Detect and prevent fraud, account abuse, and security incidents.',
+          'Meet legal obligations including GST tax records, pharmacy licensing audits, and consumer-protection law.',
+        ],
+        paragraphs: [
+          'We do NOT use your health, prescription, or order data to serve advertising. We do not sell your personal information to anyone.',
         ],
       ),
       _Section(
-        heading: '4. Data Security',
-        paragraphs: ['We implement industry-standard security measures including:'],
+        heading: '4. Who We Share With',
+        paragraphs: [
+          'We share the minimum information required, only with these processors:',
+        ],
         bullets: [
-          'SSL/TLS encryption during data transmission',
-          'Secure storage on protected servers',
-          'Access controls and authentication',
-          'Regular security audits',
+          'Razorpay Software Pvt. Ltd. — payment processing. Receives your name, mobile number, order ID, and amount to complete the transaction. Razorpay\'s own privacy policy governs their handling of card and UPI data.',
+          'Google Firebase (Cloud Messaging) — delivers our push notifications. Receives an opaque FCM token tied to your device.',
+          'Licensed pharmacists at New Balan — see prescriptions to dispense medicines, as required by law.',
+          'Government and regulatory authorities — only when compelled by a valid legal order or required by drug-control / tax / consumer-protection law.',
         ],
       ),
       _Section(
-        heading: '5. Your Rights',
+        heading: '5. How We Protect Your Data',
         bullets: [
-          'Access: Request the information we hold about you',
-          'Correction: Request correction of inaccurate data',
-          'Deletion: Request deletion (subject to legal requirements)',
-          'Opt-Out: Unsubscribe from marketing at any time',
+          'Passwords are stored as one-way bcrypt hashes — we cannot read your password even if asked.',
+          'All API traffic is encrypted in transit using HTTPS / TLS 1.2+.',
+          'Authentication tokens on your device are stored in Android EncryptedSharedPreferences / iOS Keychain.',
+          'Access to production data is restricted to a small number of authorised staff and logged.',
         ],
       ),
       _Section(
         heading: '6. Data Retention',
         paragraphs: [
-          'We retain your information as long as necessary to fulfill orders, comply with legal obligations, and resolve disputes. Prescription records may be kept longer as required by healthcare regulations.',
+          'Active accounts: we retain your profile and address details for as long as you have an account with us.',
+          'Order and invoice records: retained for at least 8 years from the order date to satisfy GST and the Drugs and Cosmetics Act recordkeeping requirements. After your account is deleted, these records remain but are no longer linked to your name, email, or phone number.',
+          'Prescriptions: retained for at least 2 years as required by pharmacy regulations.',
+          'Push notification tokens: cleared as soon as you log out or delete your account.',
+          'Diagnostic and crash data: retained for 90 days, then aggregated.',
         ],
       ),
       _Section(
-        heading: '7. Contact Us',
+        heading: '7. Your Rights',
+        paragraphs: [
+          'Under the DPDP Act 2023 you have the following rights, exercisable free of charge:',
+        ],
         bullets: [
+          'Access: request a copy of the personal information we hold about you.',
+          'Correction: update your name, email, mobile, or address from the Profile screen — or email us to correct anything else.',
+          'Deletion: delete your account at any time using Account → Delete Account inside the app. This permanently removes your identifying information and anonymises any retained order history. See §8 for what stays and why.',
+          'Withdraw consent: revoke push notifications from Settings → Notifications, or revoke storage access from your device settings.',
+          'Grievance: contact our grievance officer (details in §11) if you believe your rights have been infringed.',
+        ],
+      ),
+      _Section(
+        heading: '8. Account Deletion',
+        paragraphs: [
+          'You can delete your account directly from the app: Account → Delete Account. You will be asked to re-enter your password to prevent accidental deletion.',
+          'When you delete your account we immediately do all of the following:',
+        ],
+        bullets: [
+          'Mark the account as deleted and disable login.',
+          'Anonymise your name, email, and mobile number on past order records so they cannot be linked back to you.',
+          'Invalidate your authentication tokens and push notification tokens.',
+          'Clear saved delivery addresses, cart contents, and notification preferences.',
+        ],
+        // continued in paragraphs2 — represented as bullets work-around not needed; we add a closing paragraph below.
+      ),
+      _Section(
+        heading: '8a. What Remains After Deletion',
+        paragraphs: [
+          'Anonymised order and invoice records remain in our systems for the retention windows in §6 because GST and consumer-protection law require pharmacies to keep transaction records. After anonymisation these rows cannot be re-associated with you.',
+          'If you cannot access the app to delete your account (for example, you lost your device), email or WhatsApp us using the contact details in §11 and we will action your request within 30 days after verifying your identity.',
+        ],
+      ),
+      _Section(
+        heading: '9. Children\'s Privacy',
+        paragraphs: [
+          'New Balan Medical is intended for adults aged 18 and over. We do not knowingly create accounts for or collect personal information from children under 13. If you believe a child has registered, contact us and we will delete the account.',
+          'Parents and guardians may order medicines for children using their own adult account. In those cases, the prescription is treated like any other medical document under this policy.',
+        ],
+      ),
+      _Section(
+        heading: '10. Cross-Border Transfers',
+        paragraphs: [
+          'Our servers are located in India. The third parties listed in §4 (Razorpay, Google Firebase) may process data on infrastructure outside India. By using the app you consent to these transfers, which are subject to the contractual safeguards those providers offer.',
+        ],
+      ),
+      _Section(
+        heading: '11. Contact and Grievance Officer',
+        paragraphs: [
+          'For any privacy-related question, request, or complaint, contact our Grievance Officer:',
+        ],
+        bullets: [
+          'Name: Manikandan (Founder & Director)',
           'Email: newbalanmedicals@gmail.com',
-          'Phone: +91 9894880598',
+          'Phone / WhatsApp: +91 9894880598',
           'Address: 120/a Poobalarayapuram 2nd Street, Thoothukudi, Tamil Nadu 628001',
+        ],
+        // We acknowledge requests within 7 days and complete within 30.
+      ),
+      _Section(
+        heading: '12. Changes to This Policy',
+        paragraphs: [
+          'We may update this policy when laws change or when we add new features. Material changes will be announced in-app before they take effect. The "Last Updated" date below tells you when this version was published.',
         ],
       ),
     ],

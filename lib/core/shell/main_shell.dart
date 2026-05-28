@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import '../../features/auth/providers/auth_provider.dart';
 import '../../features/cart/providers/cart_provider.dart';
 import '../theme/app_theme.dart';
+import '../widgets/gradient_button.dart';
 
 class MainShell extends ConsumerWidget {
   final Widget child;
@@ -42,12 +43,10 @@ class MainShell extends ConsumerWidget {
             const SizedBox(height: 8),
             Text(message, style: AppTextStyles.body.copyWith(color: AppColors.textSecondary), textAlign: TextAlign.center),
             const SizedBox(height: 24),
-            SizedBox(
-              width: double.infinity,
-              child: ElevatedButton(
-                onPressed: () { Navigator.pop(context); context.go('/login'); },
-                child: const Text('Login to Continue'),
-              ),
+            GradientButton(
+              onPressed: () { Navigator.pop(context); context.go('/login'); },
+              label: 'Login to Continue',
+              icon: Icons.login_rounded,
             ),
             const SizedBox(height: 8),
             TextButton(

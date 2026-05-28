@@ -3,7 +3,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:razorpay_flutter/razorpay_flutter.dart';
 import '../../../core/theme/app_theme.dart';
+import '../../../core/widgets/gradient_button.dart';
 import '../../../core/widgets/price_row.dart';
+import '../../../core/widgets/status_views.dart';
 import '../../auth/providers/auth_provider.dart';
 import '../../cart/providers/cart_provider.dart';
 import '../../addresses/data/address_models.dart';
@@ -284,13 +286,13 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
     if (cart.items.isEmpty) {
       return Scaffold(
         appBar: AppBar(title: const Text('Checkout')),
-        body: Center(child: Column(mainAxisSize: MainAxisSize.min, children: [
-          const Icon(Icons.shopping_cart_outlined, size: 64, color: AppColors.textMuted),
-          const SizedBox(height: 16),
-          Text('Your cart is empty', style: AppTextStyles.h3),
-          const SizedBox(height: 8),
-          Text('Add medicines from the pharmacy', style: AppTextStyles.body.copyWith(color: AppColors.textSecondary)),
-        ])),
+        body: EmptyStateView(
+          icon: Icons.shopping_cart_outlined,
+          title: 'Your cart is empty',
+          message: 'Add medicines from the pharmacy to place an order.',
+          actionLabel: 'Browse Pharmacy',
+          onAction: () => Navigator.of(context).pop(),
+        ),
       );
     }
 
@@ -299,17 +301,11 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
       bottomNavigationBar: SafeArea(
         child: Padding(
           padding: const EdgeInsets.fromLTRB(16, 10, 16, 12),
-          child: ElevatedButton(
+          child: GradientButton(
             onPressed: _isSubmitting ? null : _placeOrder,
-            style: ElevatedButton.styleFrom(minimumSize: const Size(double.infinity, 54)),
-            child: _isSubmitting
-                ? const SizedBox(height: 22, width: 22, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
-                : Row(mainAxisAlignment: MainAxisAlignment.center, children: [
-                    const Icon(Icons.lock_rounded, size: 18),
-                    const SizedBox(width: 8),
-                    Text('Pay ₹${finalAmount.toStringAsFixed(2)}',
-                        style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w700, fontFamily: 'Outfit')),
-                  ]),
+            label: 'Pay ₹${finalAmount.toStringAsFixed(2)}',
+            icon: Icons.lock_rounded,
+            loading: _isSubmitting,
           ),
         ),
       ),
@@ -614,7 +610,9 @@ class _AddressPickerSheet extends StatelessWidget {
                       margin: const EdgeInsets.only(bottom: 10),
                       padding: const EdgeInsets.all(14),
                       decoration: BoxDecoration(
-                        color: isSelected ? AppColors.primary.withOpacity(0.06) : Colors.white,
+                        color: isSelected
+                            ? AppColors.primary.withOpacity(0.06)
+                            : Theme.of(context).colorScheme.surface,
                         border: Border.all(
                           color: isSelected ? AppColors.primary : AppColors.border,
                           width: isSelected ? 2 : 1,
