@@ -307,6 +307,10 @@ class _OrderDetailBodyState extends ConsumerState<_OrderDetailBody> {
                     _pdfMetaRow('Invoice No.', '#$refNum', bold: bold, regular: regular),
                     pw.SizedBox(height: 4),
                     _pdfMetaRow('Date', date.isNotEmpty ? date : '—', bold: bold, regular: regular),
+                    if (order.payment?.bankReference != null && order.payment!.bankReference!.isNotEmpty) ...[
+                      pw.SizedBox(height: 4),
+                      _pdfMetaRow('Bank Ref / UTR', order.payment!.bankReference!, bold: bold, regular: regular),
+                    ],
                   ])),
                   pw.Container(width: 1, height: 36, color: borderGrey),
                   pw.Expanded(child: pw.Padding(
@@ -689,6 +693,27 @@ class _OrderDetailBodyState extends ConsumerState<_OrderDetailBody> {
               ]),
             ),
           ),
+
+          if (order.payment?.bankReference != null && order.payment!.bankReference!.isNotEmpty) ...[
+            const SizedBox(height: 12),
+            Card(
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
+                child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                  const Icon(Icons.account_balance_outlined, size: 16, color: AppColors.textSecondary),
+                  const SizedBox(width: 8),
+                  Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                    Text('Bank Reference / UTR', style: AppTextStyles.caption.copyWith(color: AppColors.textSecondary)),
+                    const SizedBox(height: 2),
+                    SelectableText(
+                      order.payment!.bankReference!,
+                      style: AppTextStyles.body.copyWith(fontFamily: 'monospace', fontWeight: FontWeight.w600),
+                    ),
+                  ])),
+                ]),
+              ),
+            ),
+          ],
 
           if (order.payment?.refundStatus != null && order.payment!.refundStatus != 'NONE') ...[
             const SizedBox(height: 12),

@@ -29,7 +29,6 @@ class CheckoutRepository {
       'category': 'prescription',
     });
     final res = await _dio.post('/upload', data: form);
-    // Use stored_as (relative path) so backend can validate prescription/ prefix
     return (res.data['stored_as'] ?? res.data['url']) as String?;
   }
 
@@ -41,6 +40,29 @@ class CheckoutRepository {
   Future<Map<String, dynamic>> verifyPayment(Map<String, dynamic> payload) async {
     final res = await _dio.post('/razorpay/verify', data: payload);
     return res.data as Map<String, dynamic>;
+  }
+
+  /// Check stock availability for cart items before checkout.
+  /// Returns all_available flag and per-item availability details.
+  Future<Map<String, dynamic>> validateCart(List<Map<String, dynamic>> items) async {
+    final res = await _dio.post('/razorpay/validate-cart', data: {'items': items});
+    return res.data as Map<String, dynamic>;
+  }
+
+  /// Report checkout abandonment or failure to the backend so the order status
+  /// is updated and stock is restored if the payment window has expired.
+  Future<void> reportCheckoutOutcome({
+    required String orderId,
+    required String outcome, // 'abandoned' | 'failed'
+    String? errorDescription,
+    String? razorpayPaymentId,
+  }) async {
+    await _dio.post('/razorpay/checkout-outcome', data: {
+      'order_id': orderId,
+      'outcome': outcome,
+      if (errorDescription != null) 'error_description': errorDescription,
+      if (razorpayPaymentId != null) 'razorpay_payment_id': razorpayPaymentId,
+    });
   }
 }
 

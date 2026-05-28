@@ -35,13 +35,26 @@ class OrderPayment {
   final String paymentStatus;
   final String? refundStatus;
   final double? refundAmount;
+  final String? refundTransactionId;
+  final String? gatewayTransactionId;
+  final String? bankReference;
 
-  const OrderPayment({required this.paymentStatus, this.refundStatus, this.refundAmount});
+  const OrderPayment({
+    required this.paymentStatus,
+    this.refundStatus,
+    this.refundAmount,
+    this.refundTransactionId,
+    this.gatewayTransactionId,
+    this.bankReference,
+  });
 
   factory OrderPayment.fromJson(Map<String, dynamic> j) => OrderPayment(
     paymentStatus: j['payment_status']?.toString() ?? '',
     refundStatus: j['refund_status']?.toString(),
     refundAmount: double.tryParse(j['refund_amount']?.toString() ?? ''),
+    refundTransactionId: j['refund_transaction_id']?.toString(),
+    gatewayTransactionId: j['gateway_transaction_id']?.toString(),
+    bankReference: j['bank_reference']?.toString(),
   );
 }
 

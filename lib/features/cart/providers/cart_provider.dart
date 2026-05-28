@@ -52,11 +52,22 @@ class CartItem {
 
 class CartState {
   final List<CartItem> items;
-  const CartState({this.items = const []});
+  final Set<String> outOfStockIds;
+
+  const CartState({this.items = const [], this.outOfStockIds = const <String>{}});
 
   double get subtotal => items.fold(0, (s, i) => s + i.price * i.quantity);
+
+  // Subtotal excluding items currently marked as out of stock
+  double get availableSubtotal => items
+      .where((i) => !outOfStockIds.contains(i.brandOfferingId))
+      .fold(0.0, (s, i) => s + i.price * i.quantity);
+
   int get totalItems => items.fold(0, (s, i) => s + i.quantity);
   bool get hasPrescriptionItems => items.any((i) => i.requiresPrescription);
+  bool get hasOutOfStockItems =>
+      outOfStockIds.isNotEmpty &&
+      items.any((i) => outOfStockIds.contains(i.brandOfferingId));
 }
 
 class CartNotifier extends StateNotifier<CartState> {
@@ -71,7 +82,9 @@ class CartNotifier extends StateNotifier<CartState> {
     _box = await Hive.openBox(_boxKey);
     final raw = _box.get('items') as String?;
     if (raw != null) {
-      final list = (jsonDecode(raw) as List).map((e) => CartItem.fromJson(e as Map<String, dynamic>)).toList();
+      final list = (jsonDecode(raw) as List)
+          .map((e) => CartItem.fromJson(e as Map<String, dynamic>))
+          .toList();
       state = CartState(items: list);
     }
   }
@@ -85,9 +98,9 @@ class CartNotifier extends StateNotifier<CartState> {
     if (existing >= 0) {
       final updated = [...state.items];
       updated[existing].quantity += item.quantity;
-      state = CartState(items: updated);
+      state = CartState(items: updated, outOfStockIds: state.outOfStockIds);
     } else {
-      state = CartState(items: [...state.items, item]);
+      state = CartState(items: [...state.items, item], outOfStockIds: state.outOfStockIds);
     }
     _persist();
   }
@@ -101,12 +114,26 @@ class CartNotifier extends StateNotifier<CartState> {
       if (i.brandOfferingId == brandOfferingId) i.quantity = qty;
       return i;
     }).toList();
-    state = CartState(items: updated);
+    state = CartState(items: updated, outOfStockIds: state.outOfStockIds);
     _persist();
   }
 
   void removeItem(String brandOfferingId) {
-    state = CartState(items: state.items.where((i) => i.brandOfferingId != brandOfferingId).toList());
+    final newOutOfStock = Set<String>.from(state.outOfStockIds)..remove(brandOfferingId);
+    state = CartState(
+      items: state.items.where((i) => i.brandOfferingId != brandOfferingId).toList(),
+      outOfStockIds: newOutOfStock,
+    );
+    _persist();
+  }
+
+  void markOutOfStock(List<String> ids) {
+    state = CartState(items: state.items, outOfStockIds: Set.from(ids));
+  }
+
+  // Atomically replace cart contents (used to restore after failed payment).
+  void restoreItems(List<CartItem> items, {Set<String> outOfStockIds = const <String>{}}) {
+    state = CartState(items: List.from(items), outOfStockIds: outOfStockIds);
     _persist();
   }
 
