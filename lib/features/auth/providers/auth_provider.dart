@@ -35,36 +35,37 @@ class AuthNotifier extends StateNotifier<AuthState> {
     }
 
     // Restore from cache immediately so the router unblocks without waiting
-    // for the network. If cache is missing but the token is present, leave
-    // isRestoring=true and let the background fetch populate state — this
-    // keeps the user logged in across a cache wipe / app upgrade.
+    // for the network. If cache is missing but the token is present, fall
+    // through to a network fetch — this keeps the user logged in across a
+    // cache wipe / app upgrade.
+    //
+    // Note: `roleCode == 'PUBLIC'` USED to be treated as "anonymous, log out"
+    // but on this backend PUBLIC is the role assigned to every signed-up
+    // customer (see auth_service.register()). Treating it as a logged-out
+    // sentinel was wrongly wiping legitimate sessions on every cold start.
     final cachedJson = await SecureStorage.getUserJson();
     if (cachedJson != null) {
       try {
         final user = AuthUser.fromJson(jsonDecode(cachedJson) as Map<String, dynamic>);
-        if (user.roleCode == 'PUBLIC') {
-          await SecureStorage.clearAll();
-          state = const AuthState();
-          return;
-        }
         state = AuthState(user: user); // isRestoring=false — unblocks router
       } catch (_) {
         // Corrupted cache — fall through to a network fetch.
       }
     }
 
-    // Refresh user data in background. The dio interceptor handles 401 +
-    // silent token refresh + retry transparently; we only need to react if
-    // it bubbles up an error after that.
+    // Background validation. We only react to a hard 401 (session genuinely
+    // dead — the dio interceptor has already tried refresh by then). Any
+    // other failure (network, server down, partial profile data) leaves the
+    // cached user in place so the app stays usable offline.
     try {
       final user = await _repo.getMe();
-      if (user.roleCode == 'PUBLIC') {
-        await SecureStorage.clearAll();
-        state = const AuthState();
-        return;
+      // Only overwrite the cached user if the response carries real profile
+      // fields. /auth/me/permissions returns role info only — id/email/name
+      // come back empty, and overwriting with that would erase the cache.
+      if (user.id.isNotEmpty && user.email.isNotEmpty) {
+        await SecureStorage.saveUserJson(jsonEncode(user.toJson()));
+        state = state.copyWith(user: user);
       }
-      await SecureStorage.saveUserJson(jsonEncode(user.toJson()));
-      state = state.copyWith(user: user);
     } on DioException catch (e) {
       if (e.response?.statusCode == 401) {
         // Session is genuinely dead — the interceptor already attempted refresh.

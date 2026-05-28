@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/config/app_config.dart';
+import '../../../core/widgets/error_widgets.dart';
 import '../../../core/widgets/gradient_button.dart';
 import '../../../core/widgets/status_views.dart';
 import '../data/address_models.dart';
@@ -220,7 +221,7 @@ class _AddressFormSheetState extends State<_AddressFormSheet> {
       });
       if (mounted) Navigator.pop(context);
     } catch (e) {
-      if (mounted) setState(() { _isSaving = false; _error = e.toString(); });
+      if (mounted) setState(() { _isSaving = false; _error = appErrorMessage(e); });
     }
   }
 

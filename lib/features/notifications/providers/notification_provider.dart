@@ -8,6 +8,10 @@ import '../../auth/providers/auth_provider.dart';
 
 const _kPushEnabledKey = 'nb_push_enabled';
 const _kLastTokenKey = 'nb_last_fcm_token';
+// "User explicitly turned notifications off." Set when they disable from the
+// Settings screen. Suppresses the home "Allow notifications" banner so we
+// don't keep nagging them.
+const _kUserOptedOutKey = 'nb_push_opted_out';
 
 const _kAndroidChannel = AndroidNotificationChannel(
   'orders_default',
@@ -24,9 +28,14 @@ Future<void> firebaseMessagingBackgroundHandler(RemoteMessage message) async {}
 class NotificationPermissionNotifier extends StateNotifier<bool?> {
   final Ref _ref;
   String? _pushToken;
+  bool _userOptedOut = false;
 
   /// Set by app.dart once the router is ready.
   void Function(String orderId)? onOrderNotificationTap;
+
+  /// True when the user has previously disabled notifications from Settings.
+  /// Home screen reads this to suppress the "Allow notifications" banner.
+  bool get userOptedOut => _userOptedOut;
 
   NotificationPermissionNotifier(this._ref) : super(null) {
     _init();
@@ -43,6 +52,7 @@ class NotificationPermissionNotifier extends StateNotifier<bool?> {
     try {
       final prefs = await SharedPreferences.getInstance();
       final enabled = prefs.getBool(_kPushEnabledKey) ?? false;
+      _userOptedOut = prefs.getBool(_kUserOptedOutKey) ?? false;
       _pushToken = prefs.getString(_kLastTokenKey);
 
       await _setupLocalNotifications();
@@ -131,11 +141,50 @@ class NotificationPermissionNotifier extends StateNotifier<bool?> {
     );
     final granted = settings.authorizationStatus == AuthorizationStatus.authorized;
     state = granted;
+    final prefs = await SharedPreferences.getInstance();
+    // Re-enabling clears the explicit opt-out so subsequent state changes
+    // are treated as fresh decisions.
+    _userOptedOut = false;
+    await prefs.setBool(_kUserOptedOutKey, false);
     if (granted) {
-      final prefs = await SharedPreferences.getInstance();
       await prefs.setBool(_kPushEnabledKey, true);
       await _getFcmToken();
     }
+  }
+
+  /// User-initiated disable from the in-app Settings screen.
+  ///
+  /// We can't programmatically revoke the OS-level permission (Android
+  /// security rule), but we CAN tell the backend to stop targeting this
+  /// device and remember the user's preference so we never push to it
+  /// again from our side.
+  ///
+  /// Unsubscribes from both the per-user endpoint and the anonymous
+  /// broadcast endpoint — the user said "no pushes from this app," not
+  /// "only stop the order ones."
+  Future<void> disable() async {
+    final token = _pushToken;
+    if (token != null) {
+      final dio = _ref.read(dioProvider);
+      try {
+        await dio.post('/me/notification-settings/revoke', data: {
+          'expo_push_token': token,
+        });
+      } catch (_) {
+        // Ignore network failure — local state still flips off so the user
+        // sees an immediate response. Next sync will pick it up.
+      }
+      try {
+        await dio.post('/devices/unregister', data: {
+          'expo_push_token': token,
+        });
+      } catch (_) {}
+    }
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool(_kPushEnabledKey, false);
+    await prefs.setBool(_kUserOptedOutKey, true);
+    _userOptedOut = true;
+    state = false;
   }
 
   Future<void> syncWithServer() async {
@@ -149,15 +198,18 @@ class NotificationPermissionNotifier extends StateNotifier<bool?> {
 
   Future<void> revokeOnLogout() async {
     final token = _pushToken;
-    if (token == null) return;
-    try {
-      await _ref.read(dioProvider).post('/me/notification-settings/revoke', data: {
-        'expo_push_token': token,
-      });
-    } catch (_) {}
+    if (token != null) {
+      try {
+        await _ref.read(dioProvider).post('/me/notification-settings/revoke', data: {
+          'expo_push_token': token,
+        });
+      } catch (_) {}
+    }
     final prefs = await SharedPreferences.getInstance();
     await prefs.remove(_kPushEnabledKey);
     await prefs.remove(_kLastTokenKey);
+    // Logout is not an explicit opt-out — leave _kUserOptedOutKey alone so
+    // the next user on this device sees the prompt afresh.
     _pushToken = null;
     state = false;
   }
@@ -175,11 +227,27 @@ class NotificationPermissionNotifier extends StateNotifier<bool?> {
 
   Future<void> _register(String token) async {
     final user = _ref.read(authNotifierProvider).user;
-    if (user == null || user.roleCode == 'PUBLIC') return;
+    final platform = defaultTargetPlatform.name.toLowerCase();
+    // Always subscribe the device to broadcast pushes via the public endpoint,
+    // whether or not the user is signed in. Idempotent server-side.
+    try {
+      await _ref.read(dioProvider).post('/devices/register', data: {
+        'expo_push_token': token,
+        'device_platform': platform,
+      });
+    } catch (_) {
+      // Non-fatal — broadcast subscription is best-effort.
+    }
+
+    // Personal pushes (order updates, refunds, …) only when signed in.
+    // NOTE: `PUBLIC` is the standard customer role on this backend (not a
+    // guest sentinel), so we register pushes for PUBLIC users too — only a
+    // null user means truly anonymous.
+    if (user == null) return;
     try {
       await _ref.read(dioProvider).post('/me/notification-settings', data: {
         'expo_push_token': token,
-        'device_platform': defaultTargetPlatform.name.toLowerCase(),
+        'device_platform': platform,
         'is_push_enabled': true,
       });
     } catch (_) {}

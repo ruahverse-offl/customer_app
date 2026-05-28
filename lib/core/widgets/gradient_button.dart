@@ -2,7 +2,13 @@ import 'package:flutter/material.dart';
 import '../theme/app_theme.dart';
 
 /// Premium gradient CTA — mirrors `.btn-primary` from new_balan_fe.
-/// Use sparingly: one primary CTA per screen.
+///
+/// Implementation notes:
+///   • Explicit `height` (default 52) keeps the button sized correctly in any
+///     parent slot (bottomNavigationBar, Column, sliver, etc.).
+///   • No inner `Material` widget — InkWell uses the ambient Material from
+///     the Scaffold above. Avoids spinning up an extra `_InkFeatures`
+///     GlobalKey per button, which fixes a cold-start GlobalKey race.
 class GradientButton extends StatelessWidget {
   final VoidCallback? onPressed;
   final String label;
@@ -42,11 +48,9 @@ class GradientButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final disabled = onPressed == null || loading;
-    final effectiveGlow = glow ?? AppShadows.primaryGlow;
+    final radius = BorderRadius.circular(AppRadius.md);
 
-    // Explicit, finite height — keeps the button predictable in any slot
-    // (bottomNavigationBar, Column, Row, etc.). Width follows fullWidth.
-    final button = AnimatedOpacity(
+    return AnimatedOpacity(
       duration: AppMotion.fast,
       opacity: disabled ? 0.55 : 1,
       child: Container(
@@ -54,16 +58,14 @@ class GradientButton extends StatelessWidget {
         width: fullWidth ? double.infinity : null,
         decoration: BoxDecoration(
           gradient: gradient,
-          borderRadius: BorderRadius.circular(AppRadius.md),
-          boxShadow: disabled ? null : effectiveGlow,
+          borderRadius: radius,
+          boxShadow: disabled ? null : (glow ?? AppShadows.primaryGlow),
         ),
-        child: Material(
-          color: Colors.transparent,
-          borderRadius: BorderRadius.circular(AppRadius.md),
-          clipBehavior: Clip.antiAlias,
+        child: ClipRRect(
+          borderRadius: radius,
           child: InkWell(
             onTap: disabled ? null : onPressed,
-            splashColor: Colors.white.withOpacity(0.15),
+            splashColor: Colors.white.withOpacity(0.18),
             highlightColor: Colors.white.withOpacity(0.08),
             child: Padding(
               padding: padding ?? const EdgeInsets.symmetric(horizontal: 20),
@@ -99,7 +101,5 @@ class GradientButton extends StatelessWidget {
         ),
       ),
     );
-
-    return button;
   }
 }

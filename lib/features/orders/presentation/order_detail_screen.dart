@@ -10,6 +10,7 @@ import 'package:razorpay_flutter/razorpay_flutter.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../../../core/config/app_config.dart';
 import '../../../core/theme/app_theme.dart';
+import '../../../core/utils/downloads.dart';
 import '../../../core/utils/order_utils.dart';
 import '../../../core/widgets/gradient_button.dart';
 import '../../../core/widgets/price_row.dart';
@@ -447,14 +448,32 @@ class _OrderDetailBodyState extends ConsumerState<_OrderDetailBody> {
       final bytes = await pdf.save();
       final filename = 'invoice_$refNum.pdf';
 
-      // Open the system share sheet so the user can save anywhere (Drive,
-      // Downloads via SAF, WhatsApp, email…). No storage permission needed —
-      // this avoids the MANAGE_EXTERNAL_STORAGE Play policy blocker.
-      await Printing.sharePdf(bytes: bytes, filename: filename);
+      // Save to the device's public Downloads folder (Android: MediaStore;
+      // iOS: app Documents). No storage permission required on Android 10+.
+      final savedPath = await Downloads.saveBytes(
+        bytes: bytes,
+        filename: filename,
+        mimeType: 'application/pdf',
+      );
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Saved to $savedPath'),
+            backgroundColor: AppColors.secondary,
+            behavior: SnackBarBehavior.floating,
+            duration: const Duration(seconds: 5),
+            action: SnackBarAction(
+              label: 'Share',
+              textColor: Colors.white,
+              onPressed: () => Printing.sharePdf(bytes: bytes, filename: filename),
+            ),
+          ),
+        );
+      }
     } catch (_) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Could not generate invoice.'), backgroundColor: AppColors.danger),
+          const SnackBar(content: Text('Could not save invoice. Try sharing instead.'), backgroundColor: AppColors.danger),
         );
       }
     }

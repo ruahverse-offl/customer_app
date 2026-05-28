@@ -26,8 +26,29 @@ import '../shell/main_shell.dart';
 
 class _AuthNotifier extends ChangeNotifier {
   final Ref _ref;
-  _AuthNotifier(this._ref) {
-    _ref.listen(authNotifierProvider, (_, __) => notifyListeners());
+  bool _wasLoggedIn;
+  bool _wasRestoring;
+
+  _AuthNotifier(this._ref)
+      : _wasLoggedIn = _ref.read(authNotifierProvider).user != null,
+        _wasRestoring = _ref.read(authNotifierProvider).isRestoring {
+    _ref.listen(authNotifierProvider, (prev, next) {
+      final nowLoggedIn = next.user != null;
+      final nowRestoring = next.isRestoring;
+      // Only refresh routing when something the redirect() cares about
+      // changes — login status or "still restoring". Skipping no-op
+      // notifications avoids GoRouter re-evaluations on every profile
+      // refresh, which was causing cold-start _dependents.isEmpty
+      // assertions when the rebuild fired mid-frame.
+      if (nowLoggedIn == _wasLoggedIn && nowRestoring == _wasRestoring) return;
+      _wasLoggedIn = nowLoggedIn;
+      _wasRestoring = nowRestoring;
+      // Defer to the next frame so notifyListeners() never fires during a
+      // build, which is the other half of the same crash class.
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (hasListeners) notifyListeners();
+      });
+    });
   }
 
   // Browsing is allowed without login; only cart/checkout and account require login

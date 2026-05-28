@@ -1,4 +1,5 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../../core/widgets/error_widgets.dart';
 import '../data/pharmacy_models.dart';
 import '../data/pharmacy_repository.dart';
 
@@ -74,7 +75,7 @@ class MedicineListNotifier extends StateNotifier<MedicineListState> {
         offset: newItems.length,
       );
     } catch (e) {
-      state = state.copyWith(isLoading: false, isLoadingMore: false, error: e.toString());
+      state = state.copyWith(isLoading: false, isLoadingMore: false, error: appErrorMessage(e));
     }
   }
 

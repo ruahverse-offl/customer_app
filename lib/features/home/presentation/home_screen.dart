@@ -76,7 +76,11 @@ class HomeScreen extends ConsumerWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 // ── Notification banner ──────────────────────────────────
-                if (notifGranted == false)
+                // Only nudge when the OS has *denied* (notifGranted == false)
+                // AND the user hasn't explicitly turned them off from Settings.
+                // After they opt out we stop pestering them.
+                if (notifGranted == false &&
+                    !ref.read(notificationPermissionProvider.notifier).userOptedOut)
                   _NotificationBanner(
                     onAllow: () => ref.read(notificationPermissionProvider.notifier).requestPermission(),
                   ),

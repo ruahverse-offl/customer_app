@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../../core/theme/app_theme.dart';
+import '../../../core/widgets/error_widgets.dart';
 import '../../../core/widgets/gradient_button.dart';
 import '../../auth/providers/auth_provider.dart';
 
@@ -78,7 +79,7 @@ class _DeleteAccountScreenState extends ConsumerState<DeleteAccountScreen> {
     } catch (e) {
       if (mounted) {
         setState(() => _submitting = false);
-        _toast(e.toString().replaceFirst('Exception: ', ''));
+        _toast(appErrorMessage(e));
       }
     }
   }
